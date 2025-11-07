@@ -9,7 +9,7 @@ canvas.height = 600;
 let player, platforms, keys, gravity, jumpStrength, score, gameOver;
 let highScore;
 
-const coyoteTime = 30;
+const coyoteTime = 5;
 const disappearTime = 20; // Zeit in Frames, bis eine Plattform verschwindet (2 Sekunden)
 
 // Spieler-Eigenschaften

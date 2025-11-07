@@ -1,0 +1,21 @@
+body {
+    background-color: #222;
+    color: #eee;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding-top: 20px;
+}
+
+h1 {
+    margin-bottom: 20px;
+}
+
+canvas {
+    background-color: #87CEEB; /* Himmelblau */
+    border: 3px solid #eee;
+    display: block;
+    cursor: none; /* Zeigt an, dass man klicken kann (zum Neustarten) */
+}

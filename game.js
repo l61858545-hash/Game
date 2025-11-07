@@ -10,6 +10,7 @@ let player, platforms, keys, gravity, jumpStrength, score, gameOver;
 let highScore;
 
 const coyoteTime = 30;
+const disappearTime = 20; // Zeit in Frames, bis eine Plattform verschwindet (2 Sekunden)
 
 // Spieler-Eigenschaften
 const playerProps = {
@@ -33,34 +34,24 @@ function init() {
     };
 
     platforms = [
-        { x: 0, y: canvas.height - 20, width: canvas.width, height: 20, isMoving: false }
+        { x: 0, y: canvas.height - 20, width: canvas.width, height: 20, isMoving: false, isTemporary: false }
     ];
 
-    keys = {
-        right: false,
-        left: false,
-        up: false
-    };
-
+    keys = { right: false, left: false, up: false };
     gravity = 1;
     jumpStrength = -20;
     score = 0;
     gameOver = false;
-
     highScore = localStorage.getItem('platformerHighScore') || 0;
 
     for (let i = 0; i < 10; i++) {
         generateNewPlatform();
     }
 
-    // GEÄNDERT: Click-Listener werden nicht mehr benötigt
     document.removeEventListener('keydown', handleKeyDown);
     document.removeEventListener('keyup', handleKeyUp);
-    // canvas.removeEventListener('click', handleCanvasClick); // ENTFERNT
-
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
-    // canvas.addEventListener('click', handleCanvasClick); // ENTFERNT
 
     if (!gameLoop.isRunning) {
         gameLoop();
@@ -68,9 +59,9 @@ function init() {
 }
 
 function generateNewPlatform() {
-    // ... (Diese Funktion bleibt unverändert)
     const lastPlatform = platforms[platforms.length - 1];
     const difficultyFactor = Math.min(2.5, 1 + score / 5000);
+
     const maxJumpHeight = (jumpStrength ** 2) / (2 * gravity);
     const timeToPeak = -jumpStrength / gravity;
     const horizontalReach = player.speed * timeToPeak;
@@ -80,18 +71,27 @@ function generateNewPlatform() {
     const minWidth = 50;
     const maxWidth = Math.max(minWidth, 150 - (difficultyFactor - 1) * 50);
     const newPlatformWidth = Math.random() * (maxWidth - minWidth) + minWidth;
+
     const newPlatform = {
         width: newPlatformWidth,
         height: 20,
         y: lastPlatform.y - verticalGap,
-        isMoving: false
+        isMoving: false,
+        isTemporary: false
     };
-    const movingPlatformChance = 0.1 + (difficultyFactor - 1) * 0.1;
-    if (Math.random() < movingPlatformChance && score > 500) {
-        newPlatform.isMoving = true;
-        newPlatform.moveSpeed = (Math.random() * 1 + 1) * Math.min(1.5, difficultyFactor);
-        newPlatform.moveDirection = Math.random() < 0.5 ? 1 : -1;
+
+    const temporaryPlatformChance = (difficultyFactor - 1) * 0.1;
+    if (Math.random() < temporaryPlatformChance && score > 600) {
+        newPlatform.isTemporary = true;
+    } else {
+        const movingPlatformChance = 0.1 + (difficultyFactor - 1) * 0.1;
+        if (Math.random() < movingPlatformChance && score > 500 && !lastPlatform.isTemporary) {
+            newPlatform.isMoving = true;
+            newPlatform.moveSpeed = (Math.random() * 1 + 1) * Math.min(1.5, difficultyFactor);
+            newPlatform.moveDirection = Math.random() < 0.5 ? 1 : -1;
+        }
     }
+
     const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
     const maxHorizontalShift = horizontalReach * 0.9;
     let horizontalShift = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
@@ -104,18 +104,15 @@ function generateNewPlatform() {
     if (newPlatform.x + newPlatform.width > canvas.width - 10) {
         newPlatform.x = canvas.width - newPlatform.width - 10;
     }
+
     platforms.push(newPlatform);
 }
 
-// GEÄNDERT: handleKeyDown prüft jetzt auf "Enter" im Game-Over-Zustand
 function handleKeyDown(e) {
-    // Neustart-Logik
     if (e.key === 'Enter' && gameOver) {
         init();
-        return; // Verhindert, dass andere Tasten gleichzeitig verarbeitet werden
+        return;
     }
-
-    // Spiel-Steuerung
     if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
     if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') keys.up = true;
@@ -126,9 +123,6 @@ function handleKeyUp(e) {
     if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') keys.up = false;
 }
-
-// ENTFERNT: Diese Funktion wird nicht mehr gebraucht
-// function handleCanvasClick() { ... }
 
 function gameLoop() {
     gameLoop.isRunning = true;
@@ -143,8 +137,10 @@ function gameLoop() {
 }
 
 function update() {
-    // ... (unverändert)
     platforms.forEach(p => {
+        if (p.isDisappearing) {
+            p.disappearTimer--;
+        }
         if (p.isMoving) {
             p.x += p.moveSpeed * p.moveDirection;
             if (p.x < 0 || p.x + p.width > canvas.width) {
@@ -152,6 +148,9 @@ function update() {
             }
         }
     });
+
+    platforms = platforms.filter(p => !p.isTemporary || p.disappearTimer > 0 || !p.isDisappearing);
+
     if (keys.right) player.velocityX = player.speed;
     else if (keys.left) player.velocityX = -player.speed;
     else player.velocityX = 0;
@@ -166,25 +165,34 @@ function update() {
     player.y += player.velocityY;
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
     if (player.y < cameraThreshold) {
         const scrollAmount = cameraThreshold - player.y;
         player.y = cameraThreshold;
         score += Math.floor(scrollAmount);
         platforms.forEach(p => p.y += scrollAmount);
     }
+
     let onPlatform = false;
     let currentPlatform = null;
+
     platforms.forEach(platform => {
         if (player.velocityY >= 0 && player.x < platform.x + platform.width && player.x + player.width > platform.x && player.y + player.height > platform.y && player.y + player.height < platform.y + platform.height + 15) {
             player.y = platform.y - player.height;
             player.velocityY = 0;
             onPlatform = true;
             currentPlatform = platform;
+            if (currentPlatform.isTemporary && !currentPlatform.isDisappearing) {
+                currentPlatform.isDisappearing = true;
+                currentPlatform.disappearTimer = disappearTime;
+            }
         }
     });
+
     if (currentPlatform && currentPlatform.isMoving) {
         player.x += currentPlatform.moveSpeed * currentPlatform.moveDirection;
     }
+
     if (onPlatform) {
         player.isJumping = false;
         player.coyoteTimeCounter = coyoteTime;
@@ -193,10 +201,12 @@ function update() {
             player.coyoteTimeCounter--;
         }
     }
+
     platforms = platforms.filter(p => p.y < canvas.height);
     while (platforms[platforms.length - 1].y > -50) {
         generateNewPlatform();
     }
+
     if (player.y > canvas.height) {
         gameOver = true;
         if (score > highScore) {
@@ -207,12 +217,22 @@ function update() {
 }
 
 function draw() {
-    // ... (unverändert)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     platforms.forEach(platform => {
-        ctx.fillStyle = platform.isMoving ? '#FFA500' : 'green';
+        if (platform.isTemporary) {
+            ctx.fillStyle = '#C2B280';
+            if (platform.isDisappearing && platform.disappearTimer < 60 && Math.floor(platform.disappearTimer / 6) % 2 === 0) {
+                ctx.fillStyle = 'white';
+            }
+        } else if (platform.isMoving) {
+            ctx.fillStyle = '#FFA500';
+        } else {
+            ctx.fillStyle = 'green';
+        }
         ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
     });
+
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.width, player.height);
     ctx.fillStyle = 'black';
@@ -223,6 +243,7 @@ function draw() {
     ctx.fillText(`Best: ${highScore}`, canvas.width - 10, 30);
 }
 
+// WIEDER EINGEFÜGT: Die vollständige Funktion zum Zeichnen des Game-Over-Bildschirms
 function drawGameOver() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -242,7 +263,6 @@ function drawGameOver() {
     ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 40);
 
     ctx.font = '20px Arial';
-    // GEÄNDERT: Text für den Neustart
     ctx.fillText('Enter drücken zum Neustarten', canvas.width / 2, canvas.height / 2 + 90);
 }
 

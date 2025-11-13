@@ -4,9 +4,6 @@ const ctx = canvas.getContext('2d');
 canvas.width = 800;
 canvas.height = 600;
 
-// ENTFERNT: Die manuelle Versionsnummer wird nicht mehr gebraucht.
-// const CURRENT_GAME_VERSION = "1.2";
-
 let player, platforms, keys, gravity, jumpStrength, score, gameOver;
 let highScore, preUpdateScore;
 let lastTime = 0;
@@ -18,8 +15,6 @@ const playerProps = { width: 50, height: 50, color: 'red', speed: 600 };
 const cameraThreshold = canvas.height / 2;
 
 function init() {
-    // GEÄNDERT: Die Versionslogik ist weg. Wir laden die Werte jetzt direkt.
-    // Die Werte wurden bereits von version_check.js korrekt vorbereitet.
     highScore = localStorage.getItem('platformerHighScore') || 0;
     preUpdateScore = localStorage.getItem('platformerPreUpdateScore') || 0;
 
@@ -56,8 +51,7 @@ function init() {
     requestAnimationFrame(gameLoop);
 }
 
-// ... (Der Rest des Codes von generateNewPlatform bis zum Ende bleibt exakt gleich)
-
+// GEÄNDERT: Diese Funktion enthält jetzt eine "Wall Avoidance"-Logik
 function generateNewPlatform() {
     const lastPlatform = platforms[platforms.length - 1];
     const difficultyFactor = Math.min(2.5, 1 + score / 5000);
@@ -88,14 +82,33 @@ function generateNewPlatform() {
             newPlatform.moveDirection = Math.random() < 0.5 ? 1 : -1;
         }
     }
+
     const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
     const maxHorizontalShift = horizontalReach * 0.9;
-    let horizontalShift = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
-    if (Math.random() < 0.5) {
-        horizontalShift = -horizontalShift;
+    
+    // ==================================================================
+    // NEU: Logik, um "Leitern" an den Wänden zu verhindern
+    // ==================================================================
+    const wallMargin = canvas.width * 0.25; // Definiert eine 25%-Zone an jeder Seite
+    let horizontalShift;
+    const shiftMagnitude = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
+
+    if (lastPlatform.x < wallMargin) {
+        // Letzte Plattform war links, erzwinge einen Sprung nach rechts (positive Richtung)
+        horizontalShift = shiftMagnitude;
+    } else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) {
+        // Letzte Plattform war rechts, erzwinge einen Sprung nach links (negative Richtung)
+        horizontalShift = -shiftMagnitude;
+    } else {
+        // Wir sind sicher in der Mitte, wähle eine zufällige Richtung
+        horizontalShift = Math.random() < 0.5 ? shiftMagnitude : -shiftMagnitude;
     }
+    // ==================================================================
+
     const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
     newPlatform.x = (lastPlatformCenterX + horizontalShift) - newPlatform.width / 2;
+    
+    // Die Randkorrektur ist immer noch als Sicherheitsnetz da, sollte aber seltener gebraucht werden.
     if (newPlatform.x < 10) newPlatform.x = 10;
     if (newPlatform.x + newPlatform.width > canvas.width - 10) {
         newPlatform.x = canvas.width - newPlatform.width - 10;

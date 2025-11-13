@@ -7,7 +7,7 @@ canvas.height = 600;
 let player, platforms, keys, gravity, jumpStrength, score, gameOver;
 let highScore, preUpdateScore;
 let lastTime = 0;
-let lastJumpWasVertical = false; // NEU: Merkt sich, ob die letzte Plattform vertikal platziert wurde.
+let lastJumpWasVertical = false;
 
 const coyoteTime = 0.2;
 const disappearTime = 0.2;
@@ -38,7 +38,7 @@ function init() {
     jumpStrength = -1200;
     score = 0;
     gameOver = false;
-    lastJumpWasVertical = false; // NEU: Beim Neustart zurücksetzen
+    lastJumpWasVertical = false;
 
     for (let i = 0; i < 10; i++) {
         generateNewPlatform();
@@ -53,7 +53,7 @@ function init() {
     requestAnimationFrame(gameLoop);
 }
 
-// GEÄNDERT: Verhindert jetzt mehr als eine vertikale Platzierung in Folge.
+// GEÄNDERT: Die Logik für bewegliche Plattformen ist jetzt viel intelligenter.
 function generateNewPlatform() {
     const lastPlatform = platforms[platforms.length - 1];
     const difficultyFactor = Math.min(2.5, 1 + score / 5000);
@@ -66,6 +66,7 @@ function generateNewPlatform() {
     const minWidth = 50;
     const maxWidth = Math.max(minWidth, 150 - (difficultyFactor - 1) * 50);
     const newPlatformWidth = Math.random() * (maxWidth - minWidth) + minWidth;
+
     const newPlatform = {
         width: newPlatformWidth,
         height: 20,
@@ -73,58 +74,90 @@ function generateNewPlatform() {
         isMoving: false,
         isTemporary: false
     };
+
     const temporaryPlatformChance = (difficultyFactor - 1) * 0.1;
+    const movingPlatformChance = 0.1 + (difficultyFactor - 1) * 0.1;
+
+    // Entscheide, welcher Plattformtyp generiert wird
     if (Math.random() < temporaryPlatformChance && score > 1000) {
         newPlatform.isTemporary = true;
-    } else {
-        const movingPlatformChance = 0.1 + (difficultyFactor - 1) * 0.1;
-        if (Math.random() < movingPlatformChance && score > 500 && !lastPlatform.isTemporary) {
-            newPlatform.isMoving = true;
-            newPlatform.moveSpeed = (Math.random() * 1 + 1) * Math.min(1.5, difficultyFactor);
-            newPlatform.moveDirection = Math.random() < 0.5 ? 1 : -1;
-        }
+    } else if (Math.random() < movingPlatformChance && score > 500 && !lastPlatform.isTemporary) {
+        newPlatform.isMoving = true;
+        newPlatform.moveSpeed = (Math.random() * 1 + 1) * Math.min(1.5, difficultyFactor);
+        newPlatform.moveDirection = Math.random() < 0.5 ? 1 : -1;
     }
 
-    const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
-    const maxHorizontalShift = horizontalReach * 0.9;
-    const shiftMagnitude = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
-    const wallMargin = canvas.width * 0.25;
+    // ==================================================================
+    // NEU: Getrennte Platzierungslogik für bewegliche und statische Plattformen
+    // ==================================================================
     let horizontalShift;
 
-    if (lastPlatform.x < wallMargin) {
-        horizontalShift = shiftMagnitude;
-    } else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) {
-        horizontalShift = -shiftMagnitude;
-    } else {
-        horizontalShift = Math.random() < 0.5 ? shiftMagnitude : -shiftMagnitude;
-    }
+    if (newPlatform.isMoving) {
+        // --- INTELLIGENTE LOGIK FÜR BEWEGLICHE PLATTFORMEN ---
 
-    // ==================================================================
-    // NEU: Logik, um vertikale "Säulen" zu verhindern
-    // ==================================================================
-    const verticalThreshold = 20; // Pixel-Toleranz für einen "vertikalen" Sprung
+        // 1. Schätze die Dauer des Sprungs. Wir nehmen die Zeit bis zum Gipfel eines
+        //    Maximalsprungs als gute und konsistente Annäherung.
+        const estimatedJumpTime = timeToPeak;
 
-    // Prüfe, ob der geplante Sprung zu vertikal ist.
-    if (Math.abs(horizontalShift) < verticalThreshold) {
-        // Der Sprung IST vertikal. Ist das erlaubt?
-        if (lastJumpWasVertical) {
-            // NEIN, der letzte war auch vertikal. Erzwinge einen horizontalen Sprung.
-            // Wir nehmen die Richtung des (zu kleinen) Shifts und erzwingen die Minimaldistanz.
-            horizontalShift = (horizontalShift >= 0 ? 1 : -1) * minHorizontalShift;
-            lastJumpWasVertical = false; // Dieser Sprung ist jetzt garantiert horizontal.
-        } else {
-            // JA, dies ist der erste vertikale Sprung. Erlaubt.
-            lastJumpWasVertical = true; // Merke es dir für die nächste Plattform.
+        // 2. Berechne, wie weit sich die Plattform in dieser Zeit bewegen wird.
+        const platformTravelDistance = newPlatform.moveSpeed * newPlatform.moveDirection * 60 * estimatedJumpTime;
+
+        // 3. Bestimme einen erreichbaren horizontalen Ziel-Abstand für den Spieler.
+        //    Dieser Abstand ist der Ort, an dem der Spieler landen SOLL.
+        const minTargetShift = horizontalReach * 0.4; // Muss ein guter Sprung sein
+        const maxTargetShift = horizontalReach * 0.9;
+        const targetShiftMagnitude = Math.random() * (maxTargetShift - minTargetShift) + minTargetShift;
+        
+        // 4. Bestimme die Richtung des Sprungs (links/rechts), unter Berücksichtigung der Wände.
+        const wallMargin = canvas.width * 0.25;
+        let targetDirection = Math.random() < 0.5 ? 1 : -1;
+        if (lastPlatform.x < wallMargin) {
+            targetDirection = 1; // Erzwinge Sprung nach rechts
+        } else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) {
+            targetDirection = -1; // Erzwinge Sprung nach links
         }
+        const targetShift = targetShiftMagnitude * targetDirection;
+
+        // 5. Berechne den finalen Landepunkt (Mittelpunkt der Plattform).
+        const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
+        const targetLandingCenterX = lastPlatformCenterX + targetShift;
+
+        // 6. Der entscheidende Schritt: Berechne den Startpunkt der Plattform.
+        //    Startpunkt = Zielpunkt - Zurückgelegte_Distanz_der_Plattform
+        const initialPlatformCenterX = targetLandingCenterX - platformTravelDistance;
+        newPlatform.x = initialPlatformCenterX - newPlatform.width / 2;
+
     } else {
-        // Der Sprung ist horizontal, also wird jede vertikale Serie unterbrochen.
-        lastJumpWasVertical = false;
+        // --- STANDARDLOGIK FÜR STATISCHE UND TEMPORÄRE PLATTFORMEN ---
+        const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
+        const maxHorizontalShift = horizontalReach * 0.9;
+        const shiftMagnitude = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
+        const wallMargin = canvas.width * 0.25;
+
+        if (lastPlatform.x < wallMargin) {
+            horizontalShift = shiftMagnitude;
+        } else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) {
+            horizontalShift = -shiftMagnitude;
+        } else {
+            horizontalShift = Math.random() < 0.5 ? shiftMagnitude : -shiftMagnitude;
+        }
+
+        const verticalThreshold = 20;
+        if (Math.abs(horizontalShift) < verticalThreshold) {
+            if (lastJumpWasVertical) {
+                horizontalShift = (horizontalShift >= 0 ? 1 : -1) * minHorizontalShift;
+                lastJumpWasVertical = false;
+            } else {
+                lastJumpWasVertical = true;
+            }
+        } else {
+            lastJumpWasVertical = false;
+        }
+        const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
+        newPlatform.x = (lastPlatformCenterX + horizontalShift) - newPlatform.width / 2;
     }
     // ==================================================================
 
-    const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
-    newPlatform.x = (lastPlatformCenterX + horizontalShift) - newPlatform.width / 2;
-    
     if (newPlatform.x < 10) newPlatform.x = 10;
     if (newPlatform.x + newPlatform.width > canvas.width - 10) {
         newPlatform.x = canvas.width - newPlatform.width - 10;

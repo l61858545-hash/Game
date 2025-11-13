@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Highscore Verwaltung</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Zusätzliche Stile für diese Seite */
+        body {
+            justify-content: center;
+            padding-top: 50px;
+        }
+        .container {
+            background-color: #333;
+            padding: 30px;
+            border-radius: 10px;
+            border: 2px solid #eee;
+            text-align: center;
+            width: 400px;
+        }
+        .score-display {
+            font-size: 24px;
+            margin: 20px 0;
+        }
+        .score-display span {
+            font-weight: bold;
+            color: #FFD700;
+        }
+        button, input {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        a {
+            color: #87CEEB;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Highscore Verwaltung</h1>
+
+        <div class="score-display">
+            Aktueller Highscore: <span id="currentHighScore">0</span>
+        </div>
+        <div class="score-display">
+            Pre-Update Score: <span id="preUpdateScore">0</span>
+        </div>
+
+        <button id="saveButton">Scores in Datei speichern</button>
+        
+        <label for="loadInput" style="cursor: pointer; background: #555; padding: 10px; display: block; border-radius: 5px;">
+            Scores aus Datei laden
+        </label>
+        <input type="file" id="loadInput" accept=".json" style="display: none;">
+
+        <a href="index.html">Zurück zum Spiel</a>
+    </div>
+
+    <script src="scores.js"></script>
+</body>
+</html>

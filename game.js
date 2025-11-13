@@ -4,7 +4,8 @@ const ctx = canvas.getContext('2d');
 canvas.width = 800;
 canvas.height = 600;
 
-const CURRENT_GAME_VERSION = "1.3";
+// ENTFERNT: Die manuelle Versionsnummer wird nicht mehr gebraucht.
+// const CURRENT_GAME_VERSION = "1.2";
 
 let player, platforms, keys, gravity, jumpStrength, score, gameOver;
 let highScore, preUpdateScore;
@@ -17,24 +18,10 @@ const playerProps = { width: 50, height: 50, color: 'red', speed: 600 };
 const cameraThreshold = canvas.height / 2;
 
 function init() {
-    const savedVersion = localStorage.getItem('platformerVersion');
-    const loadedHighScore = localStorage.getItem('platformerHighScore') || 0;
-    const loadedPreUpdateScore = localStorage.getItem('platformerPreUpdateScore') || 0;
-
-    if (savedVersion !== CURRENT_GAME_VERSION) {
-        if (loadedHighScore > 0) {
-            preUpdateScore = loadedHighScore;
-            localStorage.setItem('platformerPreUpdateScore', preUpdateScore);
-        } else {
-            preUpdateScore = loadedPreUpdateScore;
-        }
-        highScore = 0;
-        localStorage.setItem('platformerHighScore', '0');
-        localStorage.setItem('platformerVersion', CURRENT_GAME_VERSION);
-    } else {
-        highScore = loadedHighScore;
-        preUpdateScore = loadedPreUpdateScore;
-    }
+    // GEÄNDERT: Die Versionslogik ist weg. Wir laden die Werte jetzt direkt.
+    // Die Werte wurden bereits von version_check.js korrekt vorbereitet.
+    highScore = localStorage.getItem('platformerHighScore') || 0;
+    preUpdateScore = localStorage.getItem('platformerPreUpdateScore') || 0;
 
     player = {
         ...playerProps,
@@ -68,6 +55,8 @@ function init() {
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
 }
+
+// ... (Der Rest des Codes von generateNewPlatform bis zum Ende bleibt exakt gleich)
 
 function generateNewPlatform() {
     const lastPlatform = platforms[platforms.length - 1];

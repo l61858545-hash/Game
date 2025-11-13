@@ -4,7 +4,7 @@ const ctx = canvas.getContext('2d');
 canvas.width = 800;
 canvas.height = 600;
 
-const CURRENT_GAME_VERSION = "1.2";
+const CURRENT_GAME_VERSION = "1.3";
 
 let player, platforms, keys, gravity, jumpStrength, score, gameOver;
 let highScore, preUpdateScore;

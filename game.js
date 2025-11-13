@@ -1,59 +1,40 @@
-// Canvas einrichten
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 canvas.width = 800;
 canvas.height = 600;
 
-// ==================================================================
-// NEU: SPIELVERSION - ÄNDERE DIESE NUMMER BEI JEDEM UPDATE!
-const CURRENT_GAME_VERSION = "1.2"; // z.B. "1.0", "1.1", "beta-2", etc.
-// ==================================================================
+const CURRENT_GAME_VERSION = "1.2";
 
-// Spiel-Variablen
 let player, platforms, keys, gravity, jumpStrength, score, gameOver;
-let highScore;
-let preUpdateScore; // NEU: Variable für den archivierten Highscore
+let highScore, preUpdateScore;
+let lastTime = 0;
 
-const coyoteTime = 30;
-const disappearTime = 120;
+const coyoteTime = 0.5;
+const disappearTime = 2;
 
-const playerProps = { width: 50, height: 50, color: 'red', speed: 10 };
+const playerProps = { width: 50, height: 50, color: 'red', speed: 600 };
 const cameraThreshold = canvas.height / 2;
 
 function init() {
-    // ==================================================================
-    // NEU: Logik zur Versionsprüfung und Highscore-Verwaltung
-    // ==================================================================
     const savedVersion = localStorage.getItem('platformerVersion');
     const loadedHighScore = localStorage.getItem('platformerHighScore') || 0;
     const loadedPreUpdateScore = localStorage.getItem('platformerPreUpdateScore') || 0;
 
     if (savedVersion !== CURRENT_GAME_VERSION) {
-        // Ein Update wurde erkannt!
-        console.log(`Update von Version ${savedVersion} auf ${CURRENT_GAME_VERSION} erkannt.`);
-
-        // Wenn ein alter Highscore existiert, wird er zum "Pre-Update Score".
         if (loadedHighScore > 0) {
             preUpdateScore = loadedHighScore;
             localStorage.setItem('platformerPreUpdateScore', preUpdateScore);
         } else {
-            // Falls kein alter Highscore da war, behalten wir den alten Pre-Update-Score.
             preUpdateScore = loadedPreUpdateScore;
         }
-
-        // Der aktive Highscore wird für die neue Version zurückgesetzt.
         highScore = 0;
         localStorage.setItem('platformerHighScore', '0');
-
-        // Die neue Version wird gespeichert, damit dies nur einmal passiert.
         localStorage.setItem('platformerVersion', CURRENT_GAME_VERSION);
     } else {
-        // Kein Update, lade alles wie gewohnt.
         highScore = loadedHighScore;
         preUpdateScore = loadedPreUpdateScore;
     }
-    // ==================================================================
 
     player = {
         ...playerProps,
@@ -70,8 +51,8 @@ function init() {
     ];
 
     keys = { right: false, left: false, up: false };
-    gravity = 1;
-    jumpStrength = -20;
+    gravity = 60;
+    jumpStrength = -1200;
     score = 0;
     gameOver = false;
 
@@ -84,59 +65,54 @@ function init() {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
 
-    if (!gameLoop.isRunning) {
-        gameLoop();
-    }
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
 }
 
-function generateNewPlatform() { /* ... unverändert ... */ }
-function handleKeyDown(e) { /* ... unverändert ... */ }
-function handleKeyUp(e) { /* ... unverändert ... */ }
-function gameLoop() { /* ... unverändert ... */ }
-function update() { /* ... unverändert ... */ }
-
-// GEÄNDERT: `draw` Funktion zur Anzeige des Pre-Update Scores
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    platforms.forEach(platform => {
-        if (platform.isTemporary) {
-            ctx.fillStyle = '#C2B280';
-            if (platform.isDisappearing && platform.disappearTimer < 60 && Math.floor(platform.disappearTimer / 6) % 2 === 0) {
-                ctx.fillStyle = 'white';
-            }
-        } else if (platform.isMoving) {
-            ctx.fillStyle = '#FFA500';
-        } else {
-            ctx.fillStyle = 'green';
+function generateNewPlatform() {
+    const lastPlatform = platforms[platforms.length - 1];
+    const difficultyFactor = Math.min(2.5, 1 + score / 5000);
+    const maxJumpHeight = (jumpStrength ** 2) / (2 * (gravity * 60));
+    const timeToPeak = -jumpStrength / (gravity * 60);
+    const horizontalReach = player.speed * timeToPeak;
+    const minVerticalGap = 80;
+    const maxVerticalGap = (maxJumpHeight * 0.8) * Math.min(1.1, difficultyFactor);
+    const verticalGap = Math.random() * (maxVerticalGap - minVerticalGap) + minVerticalGap;
+    const minWidth = 50;
+    const maxWidth = Math.max(minWidth, 150 - (difficultyFactor - 1) * 50);
+    const newPlatformWidth = Math.random() * (maxWidth - minWidth) + minWidth;
+    const newPlatform = {
+        width: newPlatformWidth,
+        height: 20,
+        y: lastPlatform.y - verticalGap,
+        isMoving: false,
+        isTemporary: false
+    };
+    const temporaryPlatformChance = (difficultyFactor - 1) * 0.1;
+    if (Math.random() < temporaryPlatformChance && score > 1000) {
+        newPlatform.isTemporary = true;
+    } else {
+        const movingPlatformChance = 0.1 + (difficultyFactor - 1) * 0.1;
+        if (Math.random() < movingPlatformChance && score > 500 && !lastPlatform.isTemporary) {
+            newPlatform.isMoving = true;
+            newPlatform.moveSpeed = (Math.random() * 1 + 1) * Math.min(1.5, difficultyFactor);
+            newPlatform.moveDirection = Math.random() < 0.5 ? 1 : -1;
         }
-        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
-    });
-
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x, player.y, player.width, player.height);
-
-    // Score-Anzeigen
-    ctx.fillStyle = 'black';
-    ctx.font = '24px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(`Score: ${score}`, 10, 30);
-    ctx.textAlign = 'right';
-    ctx.fillText(`Best: ${highScore}`, canvas.width - 10, 30);
-
-    // NEU: "Pre Update Score" anzeigen, falls vorhanden
-    if (preUpdateScore > 0) {
-        ctx.fillStyle = '#555'; // Etwas dunkleres Grau
-        ctx.font = '18px Arial';
-        ctx.textAlign = 'right';
-        ctx.fillText(`Pre-Update: ${preUpdateScore}`, canvas.width - 10, 60);
     }
+    const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
+    const maxHorizontalShift = horizontalReach * 0.9;
+    let horizontalShift = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
+    if (Math.random() < 0.5) {
+        horizontalShift = -horizontalShift;
+    }
+    const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
+    newPlatform.x = (lastPlatformCenterX + horizontalShift) - newPlatform.width / 2;
+    if (newPlatform.x < 10) newPlatform.x = 10;
+    if (newPlatform.x + newPlatform.width > canvas.width - 10) {
+        newPlatform.x = canvas.width - newPlatform.width - 10;
+    }
+    platforms.push(newPlatform);
 }
-
-function drawGameOver() { /* ... unverändert ... */ }
-
-// Hier folgen die unveränderten Funktionen, um sicherzustellen, dass alles komplett ist.
-// =======================================================================================
 
 function handleKeyDown(e) {
     if (e.key === 'Enter' && gameOver) {
@@ -154,49 +130,64 @@ function handleKeyUp(e) {
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') keys.up = false;
 }
 
-function gameLoop() {
-    gameLoop.isRunning = true;
+function gameLoop(currentTime) {
     if (gameOver) {
         drawGameOver();
-        gameLoop.isRunning = false;
         return;
     }
-    update();
+
+    const deltaTime = (currentTime - lastTime) / 1000;
+    lastTime = currentTime;
+
+    update(deltaTime);
     draw();
+
     requestAnimationFrame(gameLoop);
 }
 
-function update() {
+function update(deltaTime) {
     platforms.forEach(p => {
-        if (p.isDisappearing) { p.disappearTimer--; }
+        if (p.isDisappearing) {
+            p.disappearTimer -= deltaTime;
+        }
         if (p.isMoving) {
-            p.x += p.moveSpeed * p.moveDirection;
-            if (p.x < 0 || p.x + p.width > canvas.width) { p.moveDirection *= -1; }
+            p.x += p.moveSpeed * p.moveDirection * 60 * deltaTime;
+            if (p.x < 0 || p.x + p.width > canvas.width) {
+                p.moveDirection *= -1;
+            }
         }
     });
+
     platforms = platforms.filter(p => !p.isTemporary || p.disappearTimer > 0 || !p.isDisappearing);
+
     if (keys.right) player.velocityX = player.speed;
     else if (keys.left) player.velocityX = -player.speed;
     else player.velocityX = 0;
+
     if (keys.up && player.coyoteTimeCounter > 0) {
         player.velocityY = jumpStrength;
         player.isJumping = true;
         player.coyoteTimeCounter = 0;
     }
     keys.up = false;
-    player.x += player.velocityX;
-    player.velocityY += gravity;
-    player.y += player.velocityY;
+
+    player.velocityY += gravity * 60 * deltaTime;
+    player.x += player.velocityX * deltaTime;
+    player.y += player.velocityY * deltaTime;
+
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
     if (player.y < cameraThreshold) {
         const scrollAmount = cameraThreshold - player.y;
         player.y = cameraThreshold;
         score += Math.floor(scrollAmount);
         platforms.forEach(p => p.y += scrollAmount);
     }
+
     let onPlatform = false;
     let currentPlatform = null;
+
     platforms.forEach(platform => {
         if (player.velocityY >= 0 && player.x < platform.x + platform.width && player.x + player.width > platform.x && player.y + player.height > platform.y && player.y + player.height < platform.y + platform.height + 15) {
             player.y = platform.y - player.height;
@@ -209,19 +200,25 @@ function update() {
             }
         }
     });
+
     if (currentPlatform && currentPlatform.isMoving) {
-        player.x += currentPlatform.moveSpeed * currentPlatform.moveDirection;
+        player.x += currentPlatform.moveSpeed * currentPlatform.moveDirection * 60 * deltaTime;
     }
+
     if (onPlatform) {
         player.isJumping = false;
         player.coyoteTimeCounter = coyoteTime;
     } else {
-        if (player.coyoteTimeCounter > 0) { player.coyoteTimeCounter--; }
+        if (player.coyoteTimeCounter > 0) {
+            player.coyoteTimeCounter -= deltaTime;
+        }
     }
+
     platforms = platforms.filter(p => p.y < canvas.height);
     while (platforms[platforms.length - 1].y > -50) {
         generateNewPlatform();
     }
+
     if (player.y > canvas.height) {
         gameOver = true;
         if (score > highScore) {
@@ -231,39 +228,37 @@ function update() {
     }
 }
 
-function generateNewPlatform() {
-    const lastPlatform = platforms[platforms.length - 1];
-    const difficultyFactor = Math.min(2.5, 1 + score / 5000);
-    const maxJumpHeight = (jumpStrength ** 2) / (2 * gravity);
-    const timeToPeak = -jumpStrength / gravity;
-    const horizontalReach = player.speed * timeToPeak;
-    const minVerticalGap = 80;
-    const maxVerticalGap = (maxJumpHeight * 0.8) * Math.min(1.1, difficultyFactor);
-    const verticalGap = Math.random() * (maxVerticalGap - minVerticalGap) + minVerticalGap;
-    const minWidth = 50;
-    const maxWidth = Math.max(minWidth, 150 - (difficultyFactor - 1) * 50);
-    const newPlatformWidth = Math.random() * (maxWidth - minWidth) + minWidth;
-    const newPlatform = { width: newPlatformWidth, height: 20, y: lastPlatform.y - verticalGap, isMoving: false, isTemporary: false };
-    const temporaryPlatformChance = (difficultyFactor - 1) * 0.1;
-    if (Math.random() < temporaryPlatformChance && score > 1000) {
-        newPlatform.isTemporary = true;
-    } else {
-        const movingPlatformChance = 0.1 + (difficultyFactor - 1) * 0.1;
-        if (Math.random() < movingPlatformChance && score > 500 && !lastPlatform.isTemporary) {
-            newPlatform.isMoving = true;
-            newPlatform.moveSpeed = (Math.random() * 1 + 1) * Math.min(1.5, difficultyFactor);
-            newPlatform.moveDirection = Math.random() < 0.5 ? 1 : -1;
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    platforms.forEach(platform => {
+        if (platform.isTemporary) {
+            ctx.fillStyle = '#C2B280';
+            if (platform.isDisappearing && platform.disappearTimer < 1 && Math.floor(platform.disappearTimer * 10) % 2 === 0) {
+                ctx.fillStyle = 'white';
+            }
+        } else if (platform.isMoving) {
+            ctx.fillStyle = '#FFA500';
+        } else {
+            ctx.fillStyle = 'green';
         }
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    });
+
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    ctx.fillStyle = 'black';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Score: ${score}`, 10, 30);
+    ctx.textAlign = 'right';
+    ctx.fillText(`Best: ${highScore}`, canvas.width - 10, 30);
+    if (preUpdateScore > 0) {
+        ctx.fillStyle = '#555';
+        ctx.font = '18px Arial';
+        ctx.textAlign = 'right';
+        ctx.fillText(`Pre-Update: ${preUpdateScore}`, canvas.width - 10, 60);
     }
-    const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
-    const maxHorizontalShift = horizontalReach * 0.9;
-    let horizontalShift = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
-    if (Math.random() < 0.5) { horizontalShift = -horizontalShift; }
-    const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
-    newPlatform.x = (lastPlatformCenterX + horizontalShift) - newPlatform.width / 2;
-    if (newPlatform.x < 10) newPlatform.x = 10;
-    if (newPlatform.x + newPlatform.width > canvas.width - 10) { newPlatform.x = canvas.width - newPlatform.width - 10; }
-    platforms.push(newPlatform);
 }
 
 function drawGameOver() {
@@ -285,5 +280,4 @@ function drawGameOver() {
     ctx.fillText('Enter drücken zum Neustarten', canvas.width / 2, canvas.height / 2 + 90);
 }
 
-// Das Spiel zum ersten Mal starten
 init();

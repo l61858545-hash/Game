@@ -7,6 +7,7 @@ canvas.height = 600;
 let player, platforms, keys, gravity, jumpStrength, score, gameOver;
 let highScore, preUpdateScore;
 let lastTime = 0;
+let lastJumpWasVertical = false; // NEU: Merkt sich, ob die letzte Plattform vertikal platziert wurde.
 
 const coyoteTime = 0.2;
 const disappearTime = 0.2;
@@ -37,6 +38,7 @@ function init() {
     jumpStrength = -1200;
     score = 0;
     gameOver = false;
+    lastJumpWasVertical = false; // NEU: Beim Neustart zurücksetzen
 
     for (let i = 0; i < 10; i++) {
         generateNewPlatform();
@@ -51,7 +53,7 @@ function init() {
     requestAnimationFrame(gameLoop);
 }
 
-// GEÄNDERT: Diese Funktion enthält jetzt eine "Wall Avoidance"-Logik
+// GEÄNDERT: Verhindert jetzt mehr als eine vertikale Platzierung in Folge.
 function generateNewPlatform() {
     const lastPlatform = platforms[platforms.length - 1];
     const difficultyFactor = Math.min(2.5, 1 + score / 5000);
@@ -85,30 +87,44 @@ function generateNewPlatform() {
 
     const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
     const maxHorizontalShift = horizontalReach * 0.9;
-    
-    // ==================================================================
-    // NEU: Logik, um "Leitern" an den Wänden zu verhindern
-    // ==================================================================
-    const wallMargin = canvas.width * 0.25; // Definiert eine 25%-Zone an jeder Seite
-    let horizontalShift;
     const shiftMagnitude = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
+    const wallMargin = canvas.width * 0.25;
+    let horizontalShift;
 
     if (lastPlatform.x < wallMargin) {
-        // Letzte Plattform war links, erzwinge einen Sprung nach rechts (positive Richtung)
         horizontalShift = shiftMagnitude;
     } else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) {
-        // Letzte Plattform war rechts, erzwinge einen Sprung nach links (negative Richtung)
         horizontalShift = -shiftMagnitude;
     } else {
-        // Wir sind sicher in der Mitte, wähle eine zufällige Richtung
         horizontalShift = Math.random() < 0.5 ? shiftMagnitude : -shiftMagnitude;
+    }
+
+    // ==================================================================
+    // NEU: Logik, um vertikale "Säulen" zu verhindern
+    // ==================================================================
+    const verticalThreshold = 20; // Pixel-Toleranz für einen "vertikalen" Sprung
+
+    // Prüfe, ob der geplante Sprung zu vertikal ist.
+    if (Math.abs(horizontalShift) < verticalThreshold) {
+        // Der Sprung IST vertikal. Ist das erlaubt?
+        if (lastJumpWasVertical) {
+            // NEIN, der letzte war auch vertikal. Erzwinge einen horizontalen Sprung.
+            // Wir nehmen die Richtung des (zu kleinen) Shifts und erzwingen die Minimaldistanz.
+            horizontalShift = (horizontalShift >= 0 ? 1 : -1) * minHorizontalShift;
+            lastJumpWasVertical = false; // Dieser Sprung ist jetzt garantiert horizontal.
+        } else {
+            // JA, dies ist der erste vertikale Sprung. Erlaubt.
+            lastJumpWasVertical = true; // Merke es dir für die nächste Plattform.
+        }
+    } else {
+        // Der Sprung ist horizontal, also wird jede vertikale Serie unterbrochen.
+        lastJumpWasVertical = false;
     }
     // ==================================================================
 
     const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
     newPlatform.x = (lastPlatformCenterX + horizontalShift) - newPlatform.width / 2;
     
-    // Die Randkorrektur ist immer noch als Sicherheitsnetz da, sollte aber seltener gebraucht werden.
     if (newPlatform.x < 10) newPlatform.x = 10;
     if (newPlatform.x + newPlatform.width > canvas.width - 10) {
         newPlatform.x = canvas.width - newPlatform.width - 10;

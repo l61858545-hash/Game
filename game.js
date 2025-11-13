@@ -10,8 +10,8 @@ let player, platforms, keys, gravity, jumpStrength, score, gameOver;
 let highScore, preUpdateScore;
 let lastTime = 0;
 
-const coyoteTime = 0.2;
-const disappearTime = 0.5;
+const coyoteTime = 0.1;
+const disappearTime = 0.2;
 
 const playerProps = { width: 50, height: 50, color: 'red', speed: 600 };
 const cameraThreshold = canvas.height / 2;

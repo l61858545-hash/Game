@@ -255,36 +255,35 @@ function update(deltaTime) {
     }
 
     let onPlatform = false;
-    let currentPlatform = null;
-
+    
+    // ==================================================================
+    // REPARIERTE KOLLISIONSLOGIK
+    // ==================================================================
     platforms.forEach(platform => {
-        // Berechne die Position des Spielers im *letzten* Frame.
         const previousPlayerBottom = (player.y - player.velocityY * deltaTime) + player.height;
 
-        // ==================================================================
-        // REPARIERTE KOLLISIONSERKENNUNG
-        // ==================================================================
         if (
-            player.velocityY >= 0 && // Nur prüfen, wenn der Spieler fällt
-            player.x < platform.x + platform.width && player.x + player.width > platform.x && // Horizontale Überlappung
-            previousPlayerBottom <= platform.y && // Im letzten Frame war der Spieler ÜBER der Plattform
-            player.y + player.height >= platform.y // Im aktuellen Frame ist der Spieler UNTER der Plattform
+            player.velocityY >= 0 &&
+            player.x < platform.x + platform.width && player.x + player.width > platform.x &&
+            previousPlayerBottom <= platform.y + 1 && // +1 für mehr Toleranz
+            player.y + player.height >= platform.y
         ) {
-        // ==================================================================
             player.y = platform.y - player.height;
             player.velocityY = 0;
             onPlatform = true;
-            currentPlatform = platform;
-            if (currentPlatform.isTemporary && !currentPlatform.isDisappearing) {
-                currentPlatform.isDisappearing = true;
-                currentPlatform.disappearTimer = disappearTime;
+
+            // WICHTIG: Bewege den Spieler SOFORT mit der Plattform mit.
+            if (platform.isMoving) {
+                player.x += platform.moveSpeed * platform.moveDirection * 60 * deltaTime;
+            }
+
+            if (platform.isTemporary && !platform.isDisappearing) {
+                platform.isDisappearing = true;
+                platform.disappearTimer = disappearTime;
             }
         }
     });
-
-    if (currentPlatform && currentPlatform.isMoving) {
-        player.x += currentPlatform.moveSpeed * currentPlatform.moveDirection * 60 * deltaTime;
-    }
+    // ==================================================================
 
     if (onPlatform) {
         player.isJumping = false;

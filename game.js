@@ -53,110 +53,120 @@ function init() {
     requestAnimationFrame(gameLoop);
 }
 
-// GEÄNDERT: Die Logik für bewegliche Plattformen ist jetzt viel intelligenter.
 function generateNewPlatform() {
     const lastPlatform = platforms[platforms.length - 1];
     const difficultyFactor = Math.min(2.5, 1 + score / 5000);
     const maxJumpHeight = (jumpStrength ** 2) / (2 * (gravity * 60));
     const timeToPeak = -jumpStrength / (gravity * 60);
     const horizontalReach = player.speed * timeToPeak;
-    const minVerticalGap = 80;
-    const maxVerticalGap = (maxJumpHeight * 0.8) * Math.min(1.1, difficultyFactor);
-    const verticalGap = Math.random() * (maxVerticalGap - minVerticalGap) + minVerticalGap;
     const minWidth = 50;
     const maxWidth = Math.max(minWidth, 150 - (difficultyFactor - 1) * 50);
-    const newPlatformWidth = Math.random() * (maxWidth - minWidth) + minWidth;
-
+    
     const newPlatform = {
-        width: newPlatformWidth,
+        width: Math.random() * (maxWidth - minWidth) + minWidth,
         height: 20,
-        y: lastPlatform.y - verticalGap,
+        y: 0,
         isMoving: false,
         isTemporary: false
     };
 
-    const temporaryPlatformChance = (difficultyFactor - 1) * 0.1;
     const movingPlatformChance = 0.1 + (difficultyFactor - 1) * 0.1;
 
-    // Entscheide, welcher Plattformtyp generiert wird
-    if (Math.random() < temporaryPlatformChance && score > 1000) {
-        newPlatform.isTemporary = true;
-    } else if (Math.random() < movingPlatformChance && score > 500 && !lastPlatform.isTemporary) {
+    if (Math.random() < movingPlatformChance && score > 500 && !lastPlatform.isTemporary) {
         newPlatform.isMoving = true;
         newPlatform.moveSpeed = (Math.random() * 1 + 1) * Math.min(1.5, difficultyFactor);
         newPlatform.moveDirection = Math.random() < 0.5 ? 1 : -1;
     }
 
-    // ==================================================================
-    // NEU: Getrennte Platzierungslogik für bewegliche und statische Plattformen
-    // ==================================================================
     let horizontalShift;
 
     if (newPlatform.isMoving) {
-        // --- INTELLIGENTE LOGIK FÜR BEWEGLICHE PLATTFORMEN ---
-
-        // 1. Schätze die Dauer des Sprungs. Wir nehmen die Zeit bis zum Gipfel eines
-        //    Maximalsprungs als gute und konsistente Annäherung.
         const estimatedJumpTime = timeToPeak;
-
-        // 2. Berechne, wie weit sich die Plattform in dieser Zeit bewegen wird.
         const platformTravelDistance = newPlatform.moveSpeed * newPlatform.moveDirection * 60 * estimatedJumpTime;
-
-        // 3. Bestimme einen erreichbaren horizontalen Ziel-Abstand für den Spieler.
-        //    Dieser Abstand ist der Ort, an dem der Spieler landen SOLL.
-        const minTargetShift = horizontalReach * 0.4; // Muss ein guter Sprung sein
+        const minTargetShift = horizontalReach * 0.4;
         const maxTargetShift = horizontalReach * 0.9;
         const targetShiftMagnitude = Math.random() * (maxTargetShift - minTargetShift) + minTargetShift;
-        
-        // 4. Bestimme die Richtung des Sprungs (links/rechts), unter Berücksichtigung der Wände.
         const wallMargin = canvas.width * 0.25;
         let targetDirection = Math.random() < 0.5 ? 1 : -1;
-        if (lastPlatform.x < wallMargin) {
-            targetDirection = 1; // Erzwinge Sprung nach rechts
-        } else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) {
-            targetDirection = -1; // Erzwinge Sprung nach links
-        }
+        if (lastPlatform.x < wallMargin) { targetDirection = 1; } 
+        else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) { targetDirection = -1; }
         const targetShift = targetShiftMagnitude * targetDirection;
-
-        // 5. Berechne den finalen Landepunkt (Mittelpunkt der Plattform).
         const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
         const targetLandingCenterX = lastPlatformCenterX + targetShift;
-
-        // 6. Der entscheidende Schritt: Berechne den Startpunkt der Plattform.
-        //    Startpunkt = Zielpunkt - Zurückgelegte_Distanz_der_Plattform
         const initialPlatformCenterX = targetLandingCenterX - platformTravelDistance;
         newPlatform.x = initialPlatformCenterX - newPlatform.width / 2;
+        const minVerticalGap = 80;
+        const maxVerticalGap = (maxJumpHeight * 0.8) * Math.min(1.1, difficultyFactor);
+        newPlatform.y = lastPlatform.y - (Math.random() * (maxVerticalGap - minVerticalGap) + minVerticalGap);
 
     } else {
-        // --- STANDARDLOGIK FÜR STATISCHE UND TEMPORÄRE PLATTFORMEN ---
-        const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
-        const maxHorizontalShift = horizontalReach * 0.9;
-        const shiftMagnitude = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
-        const wallMargin = canvas.width * 0.25;
-
-        if (lastPlatform.x < wallMargin) {
-            horizontalShift = shiftMagnitude;
-        } else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) {
-            horizontalShift = -shiftMagnitude;
-        } else {
-            horizontalShift = Math.random() < 0.5 ? shiftMagnitude : -shiftMagnitude;
-        }
-
-        const verticalThreshold = 20;
-        if (Math.abs(horizontalShift) < verticalThreshold) {
-            if (lastJumpWasVertical) {
-                horizontalShift = (horizontalShift >= 0 ? 1 : -1) * minHorizontalShift;
-                lastJumpWasVertical = false;
-            } else {
-                lastJumpWasVertical = true;
-            }
-        } else {
+        let verticalGap;
+        const longJumpChance = 0.2 + (difficultyFactor - 1) * 0.05;
+        if (Math.random() < longJumpChance && score > 1500 && !lastJumpWasVertical) {
+            verticalGap = Math.random() * 60 - 20;
+            newPlatform.width = minWidth + Math.random() * 20;
+            const shiftMagnitude = horizontalReach * (0.8 + Math.random() * 0.15);
+            const wallMargin = canvas.width * 0.25;
+            if (lastPlatform.x < wallMargin) { horizontalShift = shiftMagnitude; } 
+            else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) { horizontalShift = -shiftMagnitude; } 
+            else { horizontalShift = Math.random() < 0.5 ? shiftMagnitude : -shiftMagnitude; }
             lastJumpWasVertical = false;
+
+        } else {
+            // --- NORMALER HOCHSPRUNG ---
+            
+            // ==================================================================
+            // NEU: Logik, um das Überspringen von Plattformen zu steuern
+            // ==================================================================
+            let minVerticalGap, maxVerticalGap;
+            const skipChance = 0.1; // 10% Chance auf eine potenziell überspringbare Plattform
+
+            if (Math.random() < skipChance && score > 800) {
+                // SELTENES EREIGNIS: Erzeuge eine tiefe Plattform, die übersprungen werden KÖNNTE.
+                minVerticalGap = 40;
+                maxVerticalGap = maxJumpHeight * 0.5;
+                // MACH ES SCHWER: Diese Plattform ist garantiert bröckelnd.
+                newPlatform.isTemporary = true;
+            } else {
+                // STANDARDVERHALTEN: Erzeuge eine hohe Plattform, die NICHT übersprungen werden kann.
+                // Der minimale Abstand ist so groß, dass zwei Sprünge immer höher sind als ein Maximalsprung.
+                minVerticalGap = maxJumpHeight * 0.7;
+                maxVerticalGap = maxJumpHeight * 0.9;
+                // Bestimme, ob die Plattform (die nicht übersprungen werden kann) bröckelnd ist.
+                const temporaryPlatformChance = (difficultyFactor - 1) * 0.1;
+                if (Math.random() < temporaryPlatformChance && score > 1000) {
+                    newPlatform.isTemporary = true;
+                }
+            }
+            verticalGap = Math.random() * (maxVerticalGap - minVerticalGap) + minVerticalGap;
+            // ==================================================================
+
+            const minHorizontalShift = horizontalReach * (0.3 * difficultyFactor);
+            const maxHorizontalShift = horizontalReach * 0.9;
+            const shiftMagnitude = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
+            const wallMargin = canvas.width * 0.25;
+
+            if (lastPlatform.x < wallMargin) { horizontalShift = shiftMagnitude; } 
+            else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) { horizontalShift = -shiftMagnitude; } 
+            else { horizontalShift = Math.random() < 0.5 ? shiftMagnitude : -shiftMagnitude; }
+
+            const verticalThreshold = 20;
+            if (Math.abs(horizontalShift) < verticalThreshold) {
+                if (lastJumpWasVertical) {
+                    horizontalShift = (horizontalShift >= 0 ? 1 : -1) * minHorizontalShift;
+                    lastJumpWasVertical = false;
+                } else {
+                    lastJumpWasVertical = true;
+                }
+            } else {
+                lastJumpWasVertical = false;
+            }
         }
+
+        newPlatform.y = lastPlatform.y - verticalGap;
         const lastPlatformCenterX = lastPlatform.x + lastPlatform.width / 2;
         newPlatform.x = (lastPlatformCenterX + horizontalShift) - newPlatform.width / 2;
     }
-    // ==================================================================
 
     if (newPlatform.x < 10) newPlatform.x = 10;
     if (newPlatform.x + newPlatform.width > canvas.width - 10) {

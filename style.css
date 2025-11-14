@@ -14,8 +14,8 @@ h1 {
 }
 
 canvas {
-    background-color: #87CEEB; /* Himmelblau */
+    background-color: #87CEEB;
     border: 3px solid #eee;
     display: block;
-    cursor: none; /* Zeigt an, dass man klicken kann (zum Neustarten) */
+    cursor: none;
 }

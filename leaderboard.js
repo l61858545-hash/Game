@@ -8,7 +8,7 @@ const DREAMLO_PRIVATE = "Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw" ;
 const DREAMLO_URL = "http://dreamlo.com/lb/" ;
 // ==================================================================
 
-const PROXY_URL = "https://api.codetabs.com/v1/proxy?quest=";
+const PROXY_URL = "https://corsproxy.io/?";
 // ==================================================================
 
 const overlay = document.getElementById('leaderboardOverlay');

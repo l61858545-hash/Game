@@ -8,7 +8,7 @@ const DREAMLO_PRIVATE = "Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw" ;
 const DREAMLO_URL = "http://dreamlo.com/lb/" ;
 // ==================================================================
 
-const PROXY_URL = "https://corsproxy.io/?";
+const PROXY_URL = "https://api.codetabs.com/v1/proxy?quest=";
 // ==================================================================
 
 const overlay = document.getElementById('leaderboardOverlay');
@@ -25,7 +25,6 @@ function showLeaderboard(score) {
     
     const savedName = localStorage.getItem('playerName');
     
-    // Logik: Wenn Name da ist, Feld sperren und Stift zeigen
     if (savedName) {
         nameInput.value = savedName;
         nameInput.disabled = true; 
@@ -44,13 +43,12 @@ function hideLeaderboard() {
     overlay.classList.add('hidden');
 }
 
-// Event Listener für den Stift-Knopf
 changePlayerBtn.addEventListener('click', () => {
-    nameInput.disabled = false; // Entsperren
-    nameInput.value = ""; // Leeren
-    nameInput.focus(); // Fokus setzen
-    changePlayerBtn.classList.add('hidden'); // Stift weg
-    localStorage.removeItem('playerName'); // Alten Namen vergessen
+    nameInput.disabled = false;
+    nameInput.value = "";
+    nameInput.focus();
+    changePlayerBtn.classList.add('hidden');
+    localStorage.removeItem('playerName');
 });
 
 async function submitScore(score) {
@@ -81,7 +79,6 @@ async function submitScore(score) {
         
     } catch (error) {
         console.error("Fehler:", error);
-        // Bei Proxys laden wir zur Sicherheit neu, auch bei Fehlern
         setTimeout(fetchLeaderboard, 1000);
         submitBtn.disabled = false;
         submitBtn.innerText = "Score senden";

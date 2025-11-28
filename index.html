@@ -16,7 +16,11 @@
             <p>Dein Score: <span id="finalScoreDisplay">0</span></p>
             
             <div id="inputSection">
-                <input type="text" id="playerName" placeholder="Dein Name" maxlength="12">
+                <!-- Wrapper für Input und Ändern-Knopf -->
+                <div class="input-wrapper">
+                    <input type="text" id="playerName" placeholder="Dein Name" maxlength="12">
+                    <button id="changePlayerBtn" class="hidden" title="Namen ändern">✎</button>
+                </div>
                 <button id="submitScoreBtn">Score senden</button>
             </div>
 
@@ -29,7 +33,7 @@
         </div>
     </div>
 
-    <!-- Skripte in der richtigen Reihenfolge -->
+    <!-- Skripte -->
     <script src="version_check.js"></script>
     <script src="leaderboard.js"></script>
     <script src="game.js"></script>

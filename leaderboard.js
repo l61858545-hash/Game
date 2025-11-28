@@ -8,7 +8,7 @@ const DREAMLO_PRIVATE = "Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw" ;
 const DREAMLO_URL = "http://dreamlo.com/lb/" ;
 // ==================================================================
 
-const PROXY_URL = "https://corsproxy.io/?";
+const PROXY_URL = "https://api.codetabs.com/v1/proxy?quest=";
 // ==================================================================
 
 const overlay = document.getElementById('leaderboardOverlay');
@@ -17,14 +17,23 @@ const nameInput = document.getElementById('playerName');
 const submitBtn = document.getElementById('submitScoreBtn');
 const list = document.getElementById('leaderboardList');
 const inputSection = document.getElementById('inputSection');
+const changePlayerBtn = document.getElementById('changePlayerBtn');
 
 function showLeaderboard(score) {
     overlay.classList.remove('hidden');
     scoreDisplay.innerText = score;
     
     const savedName = localStorage.getItem('playerName');
+    
+    // Logik: Wenn Name da ist, Feld sperren und Stift zeigen
     if (savedName) {
         nameInput.value = savedName;
+        nameInput.disabled = true; 
+        changePlayerBtn.classList.remove('hidden');
+    } else {
+        nameInput.value = "";
+        nameInput.disabled = false;
+        changePlayerBtn.classList.add('hidden');
     }
 
     inputSection.style.display = 'block';
@@ -35,6 +44,15 @@ function hideLeaderboard() {
     overlay.classList.add('hidden');
 }
 
+// Event Listener für den Stift-Knopf
+changePlayerBtn.addEventListener('click', () => {
+    nameInput.disabled = false; // Entsperren
+    nameInput.value = ""; // Leeren
+    nameInput.focus(); // Fokus setzen
+    changePlayerBtn.classList.add('hidden'); // Stift weg
+    localStorage.removeItem('playerName'); // Alten Namen vergessen
+});
+
 async function submitScore(score) {
     if (DREAMLO_PUBLIC.includes("HIER_DEIN")) {
         alert("Codes fehlen in leaderboard.js!");
@@ -43,13 +61,10 @@ async function submitScore(score) {
 
     let name = nameInput.value.trim() || "Anonym";
     name = name.replace(/[^a-zA-Z0-9]/g, "_"); 
+    
     localStorage.setItem('playerName', name);
 
-    // 1. Die eigentliche Dreamlo URL bauen
     const targetUrl = `${DREAMLO_URL}${DREAMLO_PRIVATE}/add/${name}/${score}`;
-    
-    // 2. Die URL durch den Proxy schleusen
-    // WICHTIG: Wir encoden die URL, damit Sonderzeichen nicht den Proxy verwirren
     const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
 
     try {
@@ -66,8 +81,7 @@ async function submitScore(score) {
         
     } catch (error) {
         console.error("Fehler:", error);
-        // Bei Proxys kann es sein, dass der Request durchgeht, aber keine Antwort kommt.
-        // Wir laden trotzdem neu.
+        // Bei Proxys laden wir zur Sicherheit neu, auch bei Fehlern
         setTimeout(fetchLeaderboard, 1000);
         submitBtn.disabled = false;
         submitBtn.innerText = "Score senden";
@@ -78,11 +92,8 @@ async function fetchLeaderboard() {
     list.innerHTML = "<li>Lade Daten...</li>";
     
     const targetUrl = `${DREAMLO_URL}${DREAMLO_PUBLIC}/json`;
-    
-    // Timestamp anhängen, um Caching zu verhindern
-    // Wir hängen es an die Target-URL an, BEVOR wir encoden
+    // Timestamp gegen Caching
     const targetUrlWithTime = targetUrl + "?date=" + new Date().getTime();
-
     const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrlWithTime)}`;
 
     try {
@@ -112,7 +123,6 @@ async function fetchLeaderboard() {
             entries = [entries];
         }
 
-        // Sortieren nach Score (Absteigend)
         entries.sort((a, b) => parseInt(b.score) - parseInt(a.score));
 
         entries.slice(0, 10).forEach((entry, index) => {

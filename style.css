@@ -38,6 +38,64 @@ canvas {
     display: none;
 }
 
+/* Input Bereich */
+.input-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+#playerName {
+    padding: 8px;
+    border-radius: 4px;
+    border: none;
+    width: 60%;
+}
+
+/* Wenn der Name gespeichert ist, sieht das Feld inaktiv aus */
+#playerName:disabled {
+    background-color: #444;
+    color: #ccc;
+    cursor: default;
+}
+
+/* Der unscheinbare Ändern-Knopf (Stift) */
+#changePlayerBtn {
+    background: none;
+    border: none;
+    color: #777; /* Dunkelgrau, unauffällig */
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 5px;
+    transition: color 0.2s;
+}
+
+#changePlayerBtn:hover {
+    color: #fff; /* Wird weiß beim Drüberfahren */
+}
+
+#submitScoreBtn {
+    padding: 8px 12px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+#submitScoreBtn:hover {
+    background-color: #218838;
+}
+
+#submitScoreBtn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+/* Listen Styles */
 #leaderboardList {
     list-style: none;
     padding: 0;
@@ -59,30 +117,3 @@ canvas {
 #leaderboardList li:nth-child(1) { color: #FFD700; font-weight: bold; } /* Gold */
 #leaderboardList li:nth-child(2) { color: #C0C0C0; font-weight: bold; } /* Silber */
 #leaderboardList li:nth-child(3) { color: #CD7F32; font-weight: bold; } /* Bronze */
-
-#playerName {
-    padding: 8px;
-    border-radius: 4px;
-    border: none;
-    width: 60%;
-    margin-right: 5px;
-}
-
-#submitScoreBtn {
-    padding: 8px 12px;
-    background-color: #28a745;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-#submitScoreBtn:hover {
-    background-color: #218838;
-}
-
-#submitScoreBtn:disabled {
-    background-color: #555;
-    cursor: not-allowed;
-}

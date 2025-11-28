@@ -8,7 +8,7 @@ const DREAMLO_PRIVATE = "Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw" ;
 const DREAMLO_URL = "http://dreamlo.com/lb/" ;
 // ==================================================================
 
-const PROXY_URL = "https://corsproxy.io/?";
+const PROXY_URL = "https://api.codetabs.com/v1/proxy?quest=";
 // ==================================================================
 
 const overlay = document.getElementById('leaderboardOverlay');
@@ -45,11 +45,10 @@ async function submitScore(score) {
     name = name.replace(/[^a-zA-Z0-9]/g, "_"); 
     localStorage.setItem('playerName', name);
 
-    // 1. Die eigentliche Dreamlo URL bauen
+    // 1. Dreamlo URL bauen
     const targetUrl = `${DREAMLO_URL}${DREAMLO_PRIVATE}/add/${name}/${score}`;
     
-    // 2. Die URL durch den Proxy schleusen
-    // WICHTIG: Wir encoden die URL, damit Sonderzeichen nicht den Proxy verwirren
+    // 2. Proxy URL bauen
     const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
 
     try {
@@ -79,8 +78,7 @@ async function fetchLeaderboard() {
     
     const targetUrl = `${DREAMLO_URL}${DREAMLO_PUBLIC}/json`;
     
-    // Timestamp anhängen, um Caching zu verhindern
-    // Wir hängen es an die Target-URL an, BEVOR wir encoden
+    // Timestamp anhängen gegen Caching
     const targetUrlWithTime = targetUrl + "?date=" + new Date().getTime();
 
     const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrlWithTime)}`;

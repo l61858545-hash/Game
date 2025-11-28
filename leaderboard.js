@@ -5,7 +5,7 @@
 // ==================================================================
 const DREAMLO_PUBLIC = "692962658f40bb18648fdf3e" ; 
 const DREAMLO_PRIVATE = "Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw" ; 
-const DREAMLO_URL = "http://dreamlo.com/lb/Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw" ;
+const DREAMLO_URL = "http://dreamlo.com/lb/" ;
 // ==================================================================
 
 const overlay = document.getElementById('leaderboardOverlay');

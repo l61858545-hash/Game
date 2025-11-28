@@ -18,6 +18,11 @@ const playerProps = { width: 50, height: 50, color: 'red', speed: 600 };
 const cameraThreshold = canvas.height / 2;
 
 function init() {
+    // Leaderboard verstecken beim Start
+    if (typeof hideLeaderboard === "function") {
+        hideLeaderboard();
+    }
+
     highScore = localStorage.getItem('platformerHighScore') || 0;
     preUpdateScore = localStorage.getItem('platformerPreUpdateScore') || 0;
 
@@ -77,14 +82,11 @@ function generateNewPlatform() {
     let horizontalShift;
     let verticalGap;
 
-    // ==================================================================
-    // NEUE STRUKTUR: Zuerst Plattformtyp, dann Sprungart
-    // ==================================================================
     const longJumpChance = 0.04 + (difficultyFactor - 1) * 0.04;
     const skipChance = 0.1;
     const movingPlatformChance = 0.15 + (difficultyFactor - 1) * 0.1;
 
-    // 1. Bestimme den Plattformtyp basierend auf den Wahrscheinlichkeiten und Regeln
+    // 1. Bestimme den Plattformtyp
     if (Math.random() < movingPlatformChance && score > 500 && !lastPlatform.isTemporary && !lastJumpWasLongJump) {
         // --- PLATTFORMTYP 1: BEWEGLICH ---
         newPlatform.isMoving = true;
@@ -94,19 +96,19 @@ function generateNewPlatform() {
         lastJumpWasLongJump = false;
 
     } else if (Math.random() < longJumpChance && score > 3000 && !lastJumpWasVertical && jumpsSinceLastLongJump >= 6) {
-        // --- PLATTFORMTYP 2: BRÖCKELND (als Ziel eines Weitsprungs) ---
+        // --- PLATTFORMTYP 2: BRÖCKELND (Weitsprung) ---
         newPlatform.isTemporary = true;
         jumpsSinceLastLongJump = 0;
         lastJumpWasLongJump = true;
 
     } else if (Math.random() < skipChance && score > 800 && !lastJumpWasLongJump) {
-        // --- PLATTFORMTYP 3: BRÖCKELND (als Ziel eines überspringbaren Sprungs) ---
+        // --- PLATTFORMTYP 3: BRÖCKELND (Überspringbar) ---
         newPlatform.isTemporary = true;
         jumpsSinceLastLongJump++;
         lastJumpWasLongJump = false;
 
     } else {
-        // --- PLATTFORMTYP 4: NORMAL oder BRÖCKELND (als Ziel eines hohen Sprungs) ---
+        // --- PLATTFORMTYP 4: NORMAL oder BRÖCKELND (Hochsprung) ---
         const temporaryPlatformChance = (difficultyFactor - 1) * 0.1;
         if (Math.random() < temporaryPlatformChance && score > 1000) {
             newPlatform.isTemporary = true;
@@ -115,9 +117,8 @@ function generateNewPlatform() {
         lastJumpWasLongJump = false;
     }
 
-    // 2. Platziere die Plattform basierend auf ihrem festgelegten Typ
+    // 2. Platziere die Plattform
     if (newPlatform.isMoving) {
-        // BEWEGLICHE PLATTFORMEN SIND IMMER HOHE SPRÜNGE
         const minVerticalGap = maxJumpHeight * 0.7;
         const maxVerticalGap = maxJumpHeight * 0.9;
         verticalGap = Math.random() * (maxVerticalGap - minVerticalGap) + minVerticalGap;
@@ -139,9 +140,8 @@ function generateNewPlatform() {
         newPlatform.y = lastPlatform.y - verticalGap;
 
     } else {
-        // STATISCHE PLATTFORMEN (Normal oder Bröckelnd)
         if (lastJumpWasLongJump) {
-            // DIES IST EIN WEITSPRUNG
+            // WEITSPRUNG
             verticalGap = Math.random() * 60 - 20;
             newPlatform.width = minWidth;
             const minHorizontalShift = horizontalReach * 0.95;
@@ -152,16 +152,23 @@ function generateNewPlatform() {
             else if (lastPlatform.x + lastPlatform.width > canvas.width - wallMargin) { horizontalShift = -shiftMagnitude; } 
             else { horizontalShift = Math.random() < 0.5 ? shiftMagnitude : -shiftMagnitude; }
             lastJumpWasVertical = false;
-        } else if (newPlatform.isTemporary && !lastJumpWasLongJump) {
-            // DIES KÖNNTE EIN ÜBERSPRINGBARER SPRUNG SEIN (oder ein normaler bröckelnder)
-            // Wir nehmen hier einen Mittelweg, der beide Fälle abdeckt.
-            verticalGap = Math.random() * (maxJumpHeight * 0.6 - 40) + 40;
-            const minHorizontalShift = horizontalReach * 0.2;
-            const maxHorizontalShift = horizontalReach * 0.8;
-            horizontalShift = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
-            if (Math.random() < 0.5) { horizontalShift = -horizontalShift; }
+        } else if (newPlatform.isTemporary && !lastJumpWasLongJump && !newPlatform.isMoving && Math.random() < 0.5) {
+            // ÜBERSPRINGBARER SPRUNG (Heuristik: Wenn temporär und kein Weitsprung, 50% Chance auf tiefen Sprung)
+            // Hinweis: Die Logik oben hat den Typ bestimmt, hier verfeinern wir die Platzierung.
+            // Da wir oben explizit "skipChance" hatten, können wir das hier vereinfachen, 
+            // aber um die Logik konsistent zu halten, nutzen wir die Typ-Entscheidung.
+            // Wenn wir im "skipChance"-Block waren, ist isTemporary true.
+            
+            // Um sicherzugehen, dass wir den "skipChance" Block treffen, hätten wir ein Flag setzen können.
+            // Stattdessen nutzen wir hier eine vereinfachte Logik: Wenn temporär und nicht Weitsprung,
+            // KANN es ein tiefer Sprung sein.
+             verticalGap = Math.random() * (maxJumpHeight * 0.6 - 40) + 40;
+             const minHorizontalShift = horizontalReach * 0.2;
+             const maxHorizontalShift = horizontalReach * 0.8;
+             horizontalShift = Math.random() * (maxHorizontalShift - minHorizontalShift) + minHorizontalShift;
+             if (Math.random() < 0.5) { horizontalShift = -horizontalShift; }
         } else {
-            // DIES IST EIN NORMALER HOHER SPRUNG
+            // NORMALER HOHER SPRUNG
             const minVerticalGap = maxJumpHeight * 0.7;
             const maxVerticalGap = maxJumpHeight * 0.9;
             verticalGap = Math.random() * (maxVerticalGap - minVerticalGap) + minVerticalGap;
@@ -346,22 +353,15 @@ function draw() {
 }
 
 function drawGameOver() {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'white';
-    ctx.font = '60px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 60);
-    if (score >= highScore && score > 0) {
-        ctx.font = '30px Arial';
-        ctx.fillStyle = '#FFD700';
-        ctx.fillText('New High Score!', canvas.width / 2, canvas.height / 2);
+
+    const overlay = document.getElementById('leaderboardOverlay');
+    if (overlay && overlay.classList.contains('hidden')) {
+        if (typeof showLeaderboard === "function") {
+            showLeaderboard(score);
+        }
     }
-    ctx.fillStyle = 'white';
-    ctx.font = '30px Arial';
-    ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 40);
-    ctx.font = '20px Arial';
-    ctx.fillText('Enter drücken zum Neustarten', canvas.width / 2, canvas.height / 2 + 90);
 }
 
 init();

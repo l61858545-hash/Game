@@ -5,17 +5,84 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    height: 100vh;
     margin: 0;
-    padding-top: 20px;
-}
-
-h1 {
-    margin-bottom: 20px;
 }
 
 canvas {
     background-color: #87CEEB;
     border: 3px solid #eee;
     display: block;
-    cursor: none;
+    cursor: none; /* Versteckt den Mauszeiger über dem Spiel */
+}
+
+/* Styles für das Leaderboard Overlay */
+#leaderboardOverlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 25px;
+    border-radius: 10px;
+    text-align: center;
+    width: 320px;
+    border: 2px solid #fff;
+    font-family: Arial, sans-serif;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+.hidden {
+    display: none;
+}
+
+#leaderboardList {
+    list-style: none;
+    padding: 0;
+    margin-top: 15px;
+    text-align: left;
+    max-height: 250px;
+    overflow-y: auto;
+    border-top: 1px solid #555;
+}
+
+#leaderboardList li {
+    border-bottom: 1px solid #444;
+    padding: 8px 5px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+#leaderboardList li:nth-child(1) { color: #FFD700; font-weight: bold; } /* Gold */
+#leaderboardList li:nth-child(2) { color: #C0C0C0; font-weight: bold; } /* Silber */
+#leaderboardList li:nth-child(3) { color: #CD7F32; font-weight: bold; } /* Bronze */
+
+#playerName {
+    padding: 8px;
+    border-radius: 4px;
+    border: none;
+    width: 60%;
+    margin-right: 5px;
+}
+
+#submitScoreBtn {
+    padding: 8px 12px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+#submitScoreBtn:hover {
+    background-color: #218838;
+}
+
+#submitScoreBtn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
 }

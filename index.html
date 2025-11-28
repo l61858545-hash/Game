@@ -3,12 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game</title>
+    <title>Platformer Game</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
+    <div style="position: relative;">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- Overlay für Game Over und Rangliste -->
+        <div id="leaderboardOverlay" class="hidden">
+            <h2>Game Over</h2>
+            <p>Dein Score: <span id="finalScoreDisplay">0</span></p>
+            
+            <div id="inputSection">
+                <input type="text" id="playerName" placeholder="Dein Name" maxlength="12">
+                <button id="submitScoreBtn">Score senden</button>
+            </div>
+
+            <h3>Top 10 Rangliste</h3>
+            <ul id="leaderboardList">
+                <li>Lade Daten...</li>
+            </ul>
+            
+            <p style="margin-top: 20px; font-size: 14px; color: #aaa;">Drücke ENTER zum Neustarten</p>
+        </div>
+    </div>
+
+    <!-- Skripte in der richtigen Reihenfolge -->
     <script src="version_check.js"></script>
+    <script src="leaderboard.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

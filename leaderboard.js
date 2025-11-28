@@ -8,6 +8,8 @@ const DREAMLO_PRIVATE = "Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw" ;
 const DREAMLO_URL = "http://dreamlo.com/lb/" ;
 // ==================================================================
 
+const PROXY_URL = "https://api.allorigins.win/raw?url=";
+// ==================================================================
 
 const overlay = document.getElementById('leaderboardOverlay');
 const scoreDisplay = document.getElementById('finalScoreDisplay');
@@ -17,7 +19,6 @@ const list = document.getElementById('leaderboardList');
 const inputSection = document.getElementById('inputSection');
 
 function showLeaderboard(score) {
-    console.log("Zeige Leaderboard für Score:", score);
     overlay.classList.remove('hidden');
     scoreDisplay.innerText = score;
     
@@ -35,82 +36,67 @@ function hideLeaderboard() {
 }
 
 async function submitScore(score) {
-    // Prüfen ob Codes eingefügt wurden
-    if (DREAMLO_PUBLIC.includes("HIER_DEIN") || DREAMLO_PRIVATE.includes("HIER_DEIN")) {
-        alert("FEHLER: Du hast die Dreamlo-Codes in leaderboard.js noch nicht eingefügt!");
+    if (DREAMLO_PUBLIC.includes("HIER_DEIN")) {
+        alert("Codes fehlen in leaderboard.js!");
         return;
     }
 
     let name = nameInput.value.trim() || "Anonym";
-    // Nur Buchstaben und Zahlen erlauben, keine Leerzeichen
     name = name.replace(/[^a-zA-Z0-9]/g, "_"); 
-
     localStorage.setItem('playerName', name);
 
-    // URL bauen
-    const url = `${DREAMLO_URL}${DREAMLO_PRIVATE}/add/${name}/${score}`;
-    console.log("Sende Score an:", url);
+    // 1. Die eigentliche Dreamlo URL bauen
+    const targetUrl = `${DREAMLO_URL}${DREAMLO_PRIVATE}/add/${name}/${score}`;
+    
+    // 2. Die URL durch den Proxy schleusen (WICHTIG: encodeURIComponent)
+    const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
 
     try {
         submitBtn.disabled = true;
         submitBtn.innerText = "Sende...";
 
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP Fehler! Status: ${response.status}`);
-        }
-
-        console.log("Score erfolgreich gesendet.");
+        // Wir senden den Request an den Proxy
+        await fetch(finalUrl);
         
         inputSection.style.display = 'none';
         submitBtn.disabled = false;
         submitBtn.innerText = "Score senden";
         
-        // Kurz warten, dann Liste neu laden
         setTimeout(fetchLeaderboard, 1000);
         
     } catch (error) {
-        console.error("Fehler beim Speichern:", error);
-        alert("Fehler beim Senden: " + error.message);
+        console.error("Fehler:", error);
+        // Manchmal wirft der Proxy einen Fehler, obwohl es geklappt hat.
+        // Wir laden einfach die Liste neu um zu prüfen.
+        setTimeout(fetchLeaderboard, 1000);
         submitBtn.disabled = false;
         submitBtn.innerText = "Score senden";
     }
 }
 
 async function fetchLeaderboard() {
-    if (DREAMLO_PUBLIC.includes("HIER_DEIN")) {
-        list.innerHTML = "<li>Fehler: Public Code fehlt in leaderboard.js</li>";
-        return;
-    }
-
     list.innerHTML = "<li>Lade Daten...</li>";
     
-    // JSON URL
-    const url = `${DREAMLO_URL}${DREAMLO_PUBLIC}/json`;
-    console.log("Lade Liste von:", url);
+    // 1. Dreamlo URL
+    const targetUrl = `${DREAMLO_URL}${DREAMLO_PUBLIC}/json`;
+    
+    // 2. Proxy URL
+    const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
 
     try {
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP Fehler! Status: ${response.status}`);
-        }
-
+        // Wir fügen einen Zeitstempel hinzu, damit der Browser nicht alte Daten aus dem Cache lädt
+        const response = await fetch(finalUrl + "&timestamp=" + new Date().getTime());
         const data = await response.json();
-        console.log("Daten empfangen:", data);
 
         list.innerHTML = "";
 
-        // Fall 1: Liste ist komplett leer
         if (!data.dreamlo || !data.dreamlo.leaderboard) {
             list.innerHTML = "<li>Noch keine Einträge.</li>";
             return;
         }
 
         let entries = data.dreamlo.leaderboard.entry;
-
-        // Fall 2: Es gibt nur EINEN Eintrag (Dreamlo gibt dann kein Array zurück)
+        
         if (!entries) {
              list.innerHTML = "<li>Keine Einträge gefunden.</li>";
              return;
@@ -120,17 +106,15 @@ async function fetchLeaderboard() {
             entries = [entries];
         }
 
-        // Sortieren (sicherheitshalber, falls Dreamlo es nicht tut)
+        // Sortieren
         entries.sort((a, b) => parseInt(b.score) - parseInt(a.score));
 
-        // Anzeigen (Max 10)
         entries.slice(0, 10).forEach((entry, index) => {
             const li = document.createElement("li");
             
-            // Platzierung Farben
-            if (index === 0) li.style.color = "#FFD700"; // Gold
-            if (index === 1) li.style.color = "#C0C0C0"; // Silber
-            if (index === 2) li.style.color = "#CD7F32"; // Bronze
+            if (index === 0) li.style.color = "#FFD700"; 
+            if (index === 1) li.style.color = "#C0C0C0"; 
+            if (index === 2) li.style.color = "#CD7F32"; 
 
             const nameSpan = document.createElement("span");
             nameSpan.textContent = entry.name;
@@ -146,7 +130,7 @@ async function fetchLeaderboard() {
 
     } catch (error) {
         console.error("Fehler beim Laden:", error);
-        list.innerHTML = "<li>Konnte Rangliste nicht laden. (Siehe Konsole F12)</li>";
+        list.innerHTML = "<li>Konnte Rangliste nicht laden.</li>";
     }
 }
 

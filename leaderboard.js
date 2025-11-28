@@ -8,7 +8,7 @@ const DREAMLO_PRIVATE = "Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw" ;
 const DREAMLO_URL = "http://dreamlo.com/lb/" ;
 // ==================================================================
 
-const PROXY_URL = "https://api.allorigins.win/raw?url=";
+const PROXY_URL = "https://corsproxy.io/?";
 // ==================================================================
 
 const overlay = document.getElementById('leaderboardOverlay');
@@ -48,14 +48,14 @@ async function submitScore(score) {
     // 1. Die eigentliche Dreamlo URL bauen
     const targetUrl = `${DREAMLO_URL}${DREAMLO_PRIVATE}/add/${name}/${score}`;
     
-    // 2. Die URL durch den Proxy schleusen (WICHTIG: encodeURIComponent)
+    // 2. Die URL durch den Proxy schleusen
+    // WICHTIG: Wir encoden die URL, damit Sonderzeichen nicht den Proxy verwirren
     const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
 
     try {
         submitBtn.disabled = true;
         submitBtn.innerText = "Sende...";
 
-        // Wir senden den Request an den Proxy
         await fetch(finalUrl);
         
         inputSection.style.display = 'none';
@@ -66,8 +66,8 @@ async function submitScore(score) {
         
     } catch (error) {
         console.error("Fehler:", error);
-        // Manchmal wirft der Proxy einen Fehler, obwohl es geklappt hat.
-        // Wir laden einfach die Liste neu um zu prüfen.
+        // Bei Proxys kann es sein, dass der Request durchgeht, aber keine Antwort kommt.
+        // Wir laden trotzdem neu.
         setTimeout(fetchLeaderboard, 1000);
         submitBtn.disabled = false;
         submitBtn.innerText = "Score senden";
@@ -77,15 +77,21 @@ async function submitScore(score) {
 async function fetchLeaderboard() {
     list.innerHTML = "<li>Lade Daten...</li>";
     
-    // 1. Dreamlo URL
     const targetUrl = `${DREAMLO_URL}${DREAMLO_PUBLIC}/json`;
     
-    // 2. Proxy URL
-    const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
+    // Timestamp anhängen, um Caching zu verhindern
+    // Wir hängen es an die Target-URL an, BEVOR wir encoden
+    const targetUrlWithTime = targetUrl + "?date=" + new Date().getTime();
+
+    const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrlWithTime)}`;
 
     try {
-        // Wir fügen einen Zeitstempel hinzu, damit der Browser nicht alte Daten aus dem Cache lädt
-        const response = await fetch(finalUrl + "&timestamp=" + new Date().getTime());
+        const response = await fetch(finalUrl);
+        
+        if (!response.ok) {
+            throw new Error(`Proxy Fehler: ${response.status}`);
+        }
+
         const data = await response.json();
 
         list.innerHTML = "";
@@ -106,7 +112,7 @@ async function fetchLeaderboard() {
             entries = [entries];
         }
 
-        // Sortieren
+        // Sortieren nach Score (Absteigend)
         entries.sort((a, b) => parseInt(b.score) - parseInt(a.score));
 
         entries.slice(0, 10).forEach((entry, index) => {

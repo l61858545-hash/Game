@@ -1,42 +1,97 @@
+/* Globales Reset und Font */
+* {
+    box-sizing: border-box;
+}
+
 body {
-    background-color: #222;
+    background: radial-gradient(circle at center, #2b2b2b 0%, #1a1a1a 100%); /* Subtiler Verlauf */
     color: #eee;
-    font-family: Arial, sans-serif;
+    font-family: 'Poppins', sans-serif; /* Moderne Schriftart */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100vh;
     margin: 0;
+    overflow: hidden; /* Verhindert Scrollbalken */
 }
 
+/* Das Spielfeld */
 canvas {
     background-color: #87CEEB;
-    border: 3px solid #eee;
+    border: 8px solid #fff; /* Dicker weißer Rahmen wie bei einem Foto */
+    border-radius: 4px;
     display: block;
-    cursor: none; /* Versteckt den Mauszeiger über dem Spiel */
+    cursor: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); /* Schöner Schatten für Tiefe */
 }
 
-/* Styles für das Leaderboard Overlay */
+/* Das Overlay (Game Over Screen) */
 #leaderboardOverlay {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.9);
+    
+    /* Glassmorphismus Effekt */
+    background-color: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    
     color: white;
-    padding: 25px;
-    border-radius: 10px;
+    padding: 30px;
+    border-radius: 16px;
     text-align: center;
-    width: 320px;
-    border: 2px solid #fff;
-    font-family: Arial, sans-serif;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    width: 360px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    
+    /* Animation beim Einblenden */
+    animation: fadeIn 0.3s ease-out;
 }
 
-/* WICHTIG: !important sorgt dafür, dass der Button wirklich weg ist */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translate(-50%, -45%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+/* WICHTIG: Verstecken */
 .hidden {
     display: none !important;
+}
+
+/* Typografie im Overlay */
+h2 {
+    margin: 0 0 10px 0;
+    font-weight: 800;
+    font-size: 32px;
+    color: #ff4d4d; /* Rot wie der Spieler */
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.3);
+}
+
+.score-label {
+    margin: 0;
+    font-size: 14px;
+    color: #aaa;
+    text-transform: uppercase;
+}
+
+.score-value {
+    margin: 0 0 20px 0;
+    font-size: 48px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+}
+
+h3 {
+    margin: 20px 0 10px 0;
+    font-size: 16px;
+    text-transform: uppercase;
+    color: #87CEEB; /* Himmelblau */
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+    padding-bottom: 5px;
 }
 
 /* Input Bereich */
@@ -44,77 +99,139 @@ canvas {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 5px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 15px;
+    background: rgba(255,255,255,0.05);
+    padding: 5px;
+    border-radius: 8px;
 }
 
 #playerName {
-    padding: 8px;
-    border-radius: 4px;
+    padding: 10px;
+    border-radius: 6px;
     border: none;
-    width: 60%;
+    width: 100%;
+    background: transparent;
+    color: white;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    text-align: center;
+    outline: none;
 }
 
-/* Wenn der Name gespeichert ist, sieht das Feld inaktiv aus */
+#playerName::placeholder {
+    color: #666;
+    font-weight: 400;
+}
+
 #playerName:disabled {
-    background-color: #444;
-    color: #ccc;
+    color: #fff;
     cursor: default;
 }
 
-/* Der unscheinbare Ändern-Knopf (Stift) */
+/* Der Stift-Knopf */
 #changePlayerBtn {
-    background: none;
+    background: rgba(255,255,255,0.1);
     border: none;
-    color: #777; /* Dunkelgrau, unauffällig */
+    color: #aaa;
     cursor: pointer;
-    font-size: 18px;
-    padding: 0 5px;
-    transition: color 0.2s;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
 }
 
 #changePlayerBtn:hover {
-    color: #fff; /* Wird weiß beim Drüberfahren */
+    background: #fff;
+    color: #222;
+    transform: scale(1.1);
 }
 
+/* Der Haupt-Button */
 #submitScoreBtn {
-    padding: 8px 12px;
-    background-color: #28a745;
-    color: white;
+    width: 100%;
+    padding: 12px;
+    background-color: #2ecc71; /* Helles Grün */
+    color: #1a1a1a;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
-    font-weight: bold;
+    font-weight: 800;
+    font-family: 'Poppins', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 0 #27ae60; /* 3D Effekt */
 }
 
 #submitScoreBtn:hover {
-    background-color: #218838;
+    background-color: #27ae60;
+    box-shadow: 0 2px 0 #219150;
+    transform: translateY(2px);
 }
 
 #submitScoreBtn:disabled {
     background-color: #555;
+    color: #888;
+    box-shadow: none;
     cursor: not-allowed;
+    transform: none;
 }
 
-/* Listen Styles */
+/* Rangliste */
 #leaderboardList {
     list-style: none;
     padding: 0;
-    margin-top: 15px;
+    margin: 0;
     text-align: left;
-    max-height: 250px;
+    max-height: 180px;
     overflow-y: auto;
-    border-top: 1px solid #555;
+    /* Scrollbar Styling für Webkit Browser */
+    scrollbar-width: thin;
+    scrollbar-color: #555 transparent;
+}
+
+#leaderboardList::-webkit-scrollbar {
+    width: 6px;
+}
+#leaderboardList::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 3px;
 }
 
 #leaderboardList li {
-    border-bottom: 1px solid #444;
-    padding: 8px 5px;
+    padding: 8px 10px;
     display: flex;
     justify-content: space-between;
     font-size: 14px;
+    border-radius: 6px;
+    margin-bottom: 2px;
 }
 
-#leaderboardList li:nth-child(1) { color: #FFD700; font-weight: bold; } /* Gold */
-#leaderboardList li:nth-child(2) { color: #C0C0C0; font-weight: bold; } /* Silber */
-#leaderboardList li:nth-child(3) { color: #CD7F32; font-weight: bold; } /* Bronze */
+/* Hover Effekt für Listen-Einträge */
+#leaderboardList li:hover {
+    background-color: rgba(255,255,255,0.05);
+}
+
+/* Medaillen Farben */
+#leaderboardList li:nth-child(1) { color: #FFD700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
+#leaderboardList li:nth-child(2) { color: #E0E0E0; }
+#leaderboardList li:nth-child(3) { color: #CD7F32; }
+
+.restart-hint {
+    margin-top: 25px;
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.restart-hint strong {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}

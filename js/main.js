@@ -18,10 +18,9 @@ let lastTime = 0;
 const generator = new PlatformGenerator(canvas.width);
 
 function init() {
-    // Initialisierungen
     setupInput();
     initLeaderboard();
-    checkVersionAndStorage(); // Async, aber wir warten nicht zwingend
+    checkVersionAndStorage(); 
     
     const scores = getHighScores();
     highScore = scores.highScore;
@@ -59,32 +58,59 @@ function resetGame() {
 }
 
 function gameLoop(currentTime) {
-    if (gameOver) {
-        drawGameOver();
-        // Prüfen auf Enter für Neustart
-        if (keys.enter) {
-            // Wir müssen sicherstellen, dass wir nicht sofort wieder springen
-            keys.enter = false; 
-            resetGame();
-            hideLeaderboard();
-            requestAnimationFrame(gameLoop);
-        } else {
-            requestAnimationFrame(gameLoop);
-        }
-        return;
-    }
-
     const deltaTime = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
 
     update(deltaTime);
-    draw();
+    draw(); 
+
+    if (gameOver) {
+        drawGameOver(); 
+        
+        if (keys.enter) {
+            keys.enter = false; 
+            resetGame();
+            hideLeaderboard();
+        }
+    }
 
     requestAnimationFrame(gameLoop);
 }
 
 function update(deltaTime) {
-    // Plattformen Update
+    // ============================================================
+    // SPEZIALFALL: GAME OVER
+    // ============================================================
+    if (gameOver) {
+        player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
+        
+        // Terminal Velocity auch im Game Over
+        if (player.velocityY > CONFIG.MAX_FALL_SPEED) {
+            player.velocityY = CONFIG.MAX_FALL_SPEED;
+        }
+
+        player.y += player.velocityY * deltaTime;
+        player.x += player.velocityX * deltaTime;
+
+        const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
+        
+        // Wenn der Spieler unter die Mitte fällt, schieben wir die Welt nach oben
+        if (player.y > cameraThreshold) {
+            const scrollUpAmount = player.y - cameraThreshold;
+            player.y = cameraThreshold; 
+            platforms.forEach(p => p.y -= scrollUpAmount); 
+        }
+        
+        // HIER löschen wir Plattformen, die OBEN rausfliegen (die sehen wir eh nie wieder)
+        platforms = platforms.filter(p => p.y > -100);
+
+        return; 
+    }
+
+    // ============================================================
+    // NORMALES SPIELVERHALTEN
+    // ============================================================
+
     platforms.forEach(p => {
         if (p.isDisappearing) p.disappearTimer -= deltaTime;
         if (p.isMoving) {
@@ -93,82 +119,104 @@ function update(deltaTime) {
         }
     });
 
+    // Wir löschen nur bröckelnde Plattformen, die verschwunden sind.
+    // WICHTIG: Wir löschen NICHT mehr Plattformen, die unten rausfallen!
     platforms = platforms.filter(p => !p.isTemporary || p.disappearTimer > 0 || !p.isDisappearing);
 
-    // Spieler Input
-    if (keys.right) player.velocityX = player.speed;
-    else if (keys.left) player.velocityX = -player.speed;
-    else player.velocityX = 0;
 
-    if (keys.up && player.coyoteTimeCounter > 0) {
-        player.velocityY = CONFIG.JUMP_STRENGTH;
-        player.isJumping = true;
-        player.coyoteTimeCounter = 0;
+    // Spieler Input
+    if (!gameOver) {
+        if (keys.right) player.velocityX = player.speed;
+        else if (keys.left) player.velocityX = -player.speed;
+        else player.velocityX = 0;
+
+        if (keys.up && player.coyoteTimeCounter > 0) {
+            player.velocityY = CONFIG.JUMP_STRENGTH;
+            player.isJumping = true;
+            player.coyoteTimeCounter = 0;
+        }
+        keys.up = false; 
     }
-    // Reset key um Dauerfeuer zu verhindern (optional, je nach gewünschtem Feeling)
-    keys.up = false; 
+
 
     // Physik
     player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
+    if (player.velocityY > CONFIG.MAX_FALL_SPEED) {
+        player.velocityY = CONFIG.MAX_FALL_SPEED;
+    }
+
     player.x += player.velocityX * deltaTime;
     player.y += player.velocityY * deltaTime;
+
 
     // Grenzen
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
 
-    // Kamera
+
+    // Kamera (Aufstieg)
     const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
-    if (player.y < cameraThreshold) {
-        const scrollAmount = cameraThreshold - player.y;
-        player.y = cameraThreshold;
-        score += Math.floor(scrollAmount);
-        platforms.forEach(p => p.y += scrollAmount);
-    }
 
-    // Kollision
-    let onPlatform = false;
-    platforms.forEach(platform => {
-        const previousPlayerBottom = (player.y - player.velocityY * deltaTime) + player.height;
-        if (
-            player.velocityY >= 0 &&
-            player.x < platform.x + platform.width && player.x + player.width > platform.x &&
-            previousPlayerBottom <= platform.y + 1 &&
-            player.y + player.height >= platform.y
-        ) {
-            player.y = platform.y - player.height;
-            player.velocityY = 0;
-            onPlatform = true;
-
-            if (platform.isMoving) {
-                player.x += platform.moveSpeed * platform.moveDirection * 60 * deltaTime;
-            }
-            if (platform.isTemporary && !platform.isDisappearing) {
-                platform.isDisappearing = true;
-                platform.disappearTimer = CONFIG.DISAPPEAR_TIME;
-            }
+    if (!gameOver) {
+        if (player.y < cameraThreshold) {
+            const scrollAmount = cameraThreshold - player.y;
+            player.y = cameraThreshold;
+            score += Math.floor(scrollAmount);
+            platforms.forEach(p => p.y += scrollAmount);
         }
-    });
-
-    if (onPlatform) {
-        player.isJumping = false;
-        player.coyoteTimeCounter = CONFIG.COYOTE_TIME;
-    } else {
-        if (player.coyoteTimeCounter > 0) player.coyoteTimeCounter -= deltaTime;
     }
 
-    // Generierung & Cleanup
-    platforms = platforms.filter(p => p.y < canvas.height);
-    while (platforms[platforms.length - 1].y > -50) {
-        generator.generate(platforms, player, score);
-    }
 
-    // Game Over
-    if (player.y > canvas.height) {
-        gameOver = true;
-        if (score > highScore) {
-            highScore = score;
-            saveHighScore(highScore);
+    // Kollisionen & Generierung
+    if (!gameOver) {
+        let onPlatform = false;
+        platforms.forEach(platform => {
+            const previousPlayerBottom = (player.y - player.velocityY * deltaTime) + player.height;
+            if (
+                player.velocityY >= 0 &&
+                player.x < platform.x + platform.width && player.x + player.width > platform.x &&
+                previousPlayerBottom <= platform.y + 1 &&
+                player.y + player.height >= platform.y
+            ) {
+                player.y = platform.y - player.height;
+                player.velocityY = 0;
+                onPlatform = true;
+
+                if (platform.isMoving) {
+                    player.x += platform.moveSpeed * platform.moveDirection * 60 * deltaTime;
+                }
+                if (platform.isTemporary && !platform.isDisappearing) {
+                    platform.isDisappearing = true;
+                    platform.disappearTimer = CONFIG.DISAPPEAR_TIME;
+                }
+            }
+        });
+
+        if (onPlatform) {
+            player.isJumping = false;
+            player.coyoteTimeCounter = CONFIG.COYOTE_TIME;
+        } else {
+            if (player.coyoteTimeCounter > 0) player.coyoteTimeCounter -= deltaTime;
+        }
+
+        // WICHTIG: Die Zeile "platforms = platforms.filter(p => p.y < canvas.height);" wurde ENTFERNT.
+        // Stattdessen generieren wir einfach neue, wenn die höchste Plattform zu tief rutscht.
+        
+        // Wir prüfen die HÖCHSTE Plattform (die mit dem kleinsten Y-Wert)
+        // Da das Array sortiert generiert wird, ist die letzte im Array die höchste.
+        const highestPlatform = platforms[platforms.length - 1];
+        
+        // Wenn die höchste Plattform in den sichtbaren Bereich kommt (oder kurz davor), neue generieren
+        if (highestPlatform.y > -50) {
+            generator.generate(platforms, player, score);
+        }
+
+        if (player.y > canvas.height) {
+            gameOver = true;
+            if (score > highScore) {
+                highScore = score;
+                saveHighScore(highScore);
+            }
         }
     }
 }
@@ -177,6 +225,13 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     platforms.forEach(platform => {
+        // PERFORMANCE OPTIMIERUNG:
+        // Zeichne die Plattform NUR, wenn sie im sichtbaren Bereich ist.
+        // Da wir alte Plattformen nicht mehr löschen, ist das wichtig für die FPS.
+        if (platform.y > canvas.height || platform.y + platform.height < 0) {
+            return;
+        }
+
         if (platform.isTemporary) {
             ctx.fillStyle = '#C2B280';
             if (platform.isDisappearing && platform.disappearTimer < 1 && Math.floor(platform.disappearTimer * 10) % 2 === 0) {
@@ -212,12 +267,10 @@ function drawGameOver() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Overlay aufrufen
     const overlay = document.getElementById('leaderboardOverlay');
     if (overlay && overlay.classList.contains('hidden')) {
         showLeaderboard(score);
     }
 }
 
-// Start
 init();

@@ -15,6 +15,13 @@ let player, platforms, score, gameOver;
 let highScore, preUpdateScore;
 let lastTime = 0;
 
+// Shake Variablen
+let impactShakeTimer = 0;
+let impactShakeStrength = 0;
+let hasHitGround = false;
+let currentFallShake = 0;
+let maxFallDistance = 0;
+
 const generator = new PlatformGenerator(canvas.width);
 
 function init() {
@@ -58,6 +65,12 @@ function resetGame() {
 
     score = 0;
     gameOver = false;
+    
+    impactShakeTimer = 0;
+    hasHitGround = false;
+    currentFallShake = 0;
+    maxFallDistance = 0;
+
     generator.reset();
 
     for (let i = 0; i < 10; i++) {
@@ -73,6 +86,7 @@ function gameLoop(currentTime) {
     draw(); 
 
     if (gameOver) {
+        // KORREKTUR: Wir zeigen das Overlay SOFORT an, nicht erst beim Aufprall.
         drawGameOver(); 
         
         if (keys.enter) {
@@ -86,34 +100,32 @@ function gameLoop(currentTime) {
 }
 
 function update(deltaTime) {
+    if (impactShakeTimer > 0) {
+        impactShakeTimer -= deltaTime;
+    }
+
     // ============================================================
     // SPEZIALFALL: GAME OVER
     // ============================================================
     if (gameOver) {
-        // 1. NEU: Horizontale Bewegung erlauben (statt velocityX = 0)
-        if (keys.right) {
-            player.velocityX = CONFIG.PLAYER.speed;
-        } else if (keys.left) {
-            player.velocityX = -CONFIG.PLAYER.speed;
-        } else {
-            player.velocityX = 0;
-        }
+        if (hasHitGround) return;
 
-        // 2. Schwerkraft anwenden
+        if (keys.right) player.velocityX = CONFIG.PLAYER.speed;
+        else if (keys.left) player.velocityX = -CONFIG.PLAYER.speed;
+        else player.velocityX = 0;
+
         player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
         if (player.velocityY > CONFIG.MAX_FALL_SPEED) {
             player.velocityY = CONFIG.MAX_FALL_SPEED;
         }
 
-        // 3. Position aktualisieren (X und Y)
         player.x += player.velocityX * deltaTime;
         player.y += player.velocityY * deltaTime;
 
-        // 4. NEU: Grenzen prüfen (damit man nicht aus dem Bild fliegt)
         if (player.x < 0) player.x = 0;
         if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
 
-        // 5. KAMERA-LOGIK (Nach unten folgen)
+        // Kamera folgt nach unten
         const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
         
         if (player.y > cameraThreshold) {
@@ -122,23 +134,38 @@ function update(deltaTime) {
             platforms.forEach(p => p.y -= scrollUpAmount); 
         }
 
-        // 6. BODEN-KOLLISION PRÜFEN
+        // Boden-Kollision & Shake-Berechnung
         const ground = platforms.find(p => p.isGround);
         
         if (ground) {
+            // 1. BERECHNE FALL-SHAKE INTENSITÄT (DYNAMISCH)
+            const currentDistance = ground.y - (player.y + player.height);
+            
+            if (maxFallDistance > 0 && currentDistance > 0) {
+                const ratio = currentDistance / maxFallDistance;
+                let intensity = 1 - ratio;
+                intensity = Math.max(0, Math.min(1, intensity));
+                intensity = intensity * intensity; 
+
+                currentFallShake = intensity * CONFIG.SHAKE.FALL_MAX_STRENGTH;
+            } else {
+                currentFallShake = CONFIG.SHAKE.FALL_MAX_STRENGTH;
+            }
+
+            // 2. Kollisionsprüfung
             if (
+                player.x < ground.x + ground.width &&
+                player.x + player.width > ground.x &&
                 player.y + player.height >= ground.y && 
-                player.y < ground.y + ground.height &&  
-                player.x < ground.x + ground.width &&   
-                player.x + player.width > ground.x
+                player.y < ground.y + ground.height
             ) {
                 player.y = ground.y - player.height;
                 player.velocityY = 0;
-                // Hinweis: Da wir velocityX oben setzen, kann der Spieler
-                // jetzt auf dem Boden hin und her rutschen.
+                triggerGroundShake();
+                hasHitGround = true;
+                currentFallShake = 0; 
             }
         }
-
         return; 
     }
 
@@ -156,8 +183,6 @@ function update(deltaTime) {
 
     platforms = platforms.filter(p => !p.isTemporary || p.disappearTimer > 0 || !p.isDisappearing);
 
-
-    // Spieler Input
     if (!gameOver) {
         if (keys.right) player.velocityX = player.speed;
         else if (keys.left) player.velocityX = -player.speed;
@@ -171,8 +196,6 @@ function update(deltaTime) {
         keys.up = false; 
     }
 
-
-    // Physik
     player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
     if (player.velocityY > CONFIG.MAX_FALL_SPEED) {
         player.velocityY = CONFIG.MAX_FALL_SPEED;
@@ -181,13 +204,9 @@ function update(deltaTime) {
     player.x += player.velocityX * deltaTime;
     player.y += player.velocityY * deltaTime;
 
-
-    // Grenzen
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
 
-
-    // Kamera (Aufstieg)
     const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
 
     if (!gameOver) {
@@ -199,55 +218,96 @@ function update(deltaTime) {
         }
     }
 
+    let onPlatform = false;
+    platforms.forEach(platform => {
+        const previousPlayerBottom = (player.y - player.velocityY * deltaTime) + player.height;
+        if (
+            player.velocityY >= 0 &&
+            player.x < platform.x + platform.width && player.x + player.width > platform.x &&
+            previousPlayerBottom <= platform.y + 1 &&
+            player.y + player.height >= platform.y
+        ) {
+            player.y = platform.y - player.height;
+            player.velocityY = 0;
+            onPlatform = true;
 
-    // Kollisionen & Generierung
-    if (!gameOver) {
-        let onPlatform = false;
-        platforms.forEach(platform => {
-            const previousPlayerBottom = (player.y - player.velocityY * deltaTime) + player.height;
-            if (
-                player.velocityY >= 0 &&
-                player.x < platform.x + platform.width && player.x + player.width > platform.x &&
-                previousPlayerBottom <= platform.y + 1 &&
-                player.y + player.height >= platform.y
-            ) {
-                player.y = platform.y - player.height;
-                player.velocityY = 0;
-                onPlatform = true;
-
-                if (platform.isMoving) {
-                    player.x += platform.moveSpeed * platform.moveDirection * 60 * deltaTime;
-                }
-                if (platform.isTemporary && !platform.isDisappearing) {
-                    platform.isDisappearing = true;
-                    platform.disappearTimer = CONFIG.DISAPPEAR_TIME;
-                }
+            if (platform.isMoving) {
+                player.x += platform.moveSpeed * platform.moveDirection * 60 * deltaTime;
             }
-        });
+            if (platform.isTemporary && !platform.isDisappearing) {
+                platform.isDisappearing = true;
+                platform.disappearTimer = CONFIG.DISAPPEAR_TIME;
+            }
+        }
+    });
 
-        if (onPlatform) {
-            player.isJumping = false;
-            player.coyoteTimeCounter = CONFIG.COYOTE_TIME;
+    if (onPlatform) {
+        player.isJumping = false;
+        player.coyoteTimeCounter = CONFIG.COYOTE_TIME;
+    } else {
+        if (player.coyoteTimeCounter > 0) player.coyoteTimeCounter -= deltaTime;
+    }
+
+    const highestPlatform = platforms[platforms.length - 1];
+    if (highestPlatform.y > -50) {
+        generator.generate(platforms, player, score);
+    }
+
+    // Game Over Bedingung
+    let lowestVisiblePlatformY = -Infinity;
+    platforms.forEach(p => {
+        if (p.y < canvas.height && p.y > lowestVisiblePlatformY) {
+            lowestVisiblePlatformY = p.y;
+        }
+    });
+    if (lowestVisiblePlatformY === -Infinity) lowestVisiblePlatformY = canvas.height;
+
+    if (player.y > lowestVisiblePlatformY + player.height) {
+        gameOver = true;
+        
+        const ground = platforms.find(p => p.isGround);
+        if (ground) {
+            maxFallDistance = ground.y - player.y;
         } else {
-            if (player.coyoteTimeCounter > 0) player.coyoteTimeCounter -= deltaTime;
+            maxFallDistance = 5000; 
         }
 
-        const highestPlatform = platforms[platforms.length - 1];
-        if (highestPlatform.y > -50) {
-            generator.generate(platforms, player, score);
-        }
-
-        if (player.y > canvas.height) {
-            gameOver = true;
-            if (score > highScore) {
-                highScore = score;
-                saveHighScore(highScore);
-            }
+        if (score > highScore) {
+            highScore = score;
+            saveHighScore(highScore);
         }
     }
 }
 
+function triggerGroundShake() {
+    impactShakeTimer = CONFIG.SHAKE.GROUND_DURATION;
+    impactShakeStrength = CONFIG.SHAKE.GROUND_STRENGTH;
+}
+
 function draw() {
+    ctx.save();
+
+    let shakeX = 0;
+    let shakeY = 0;
+
+    // 1. Fall-Shake
+    if (gameOver && !hasHitGround && currentFallShake > 0) {
+        shakeX += (Math.random() - 0.5) * 2 * currentFallShake;
+        shakeY += (Math.random() - 0.5) * 2 * currentFallShake;
+    }
+
+    // 2. Impact-Shake
+    if (impactShakeTimer > 0) {
+        const decay = impactShakeTimer / CONFIG.SHAKE.GROUND_DURATION;
+        const currentImpactStrength = impactShakeStrength * decay;
+        shakeX += (Math.random() - 0.5) * 2 * currentImpactStrength;
+        shakeY += (Math.random() - 0.5) * 2 * currentImpactStrength;
+    }
+
+    if (shakeX !== 0 || shakeY !== 0) {
+        ctx.translate(shakeX, shakeY);
+    }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     platforms.forEach(platform => {
@@ -271,6 +331,7 @@ function draw() {
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
+    // HUD
     ctx.fillStyle = 'black';
     ctx.font = '24px Poppins, Arial';
     ctx.textAlign = 'left';
@@ -283,6 +344,8 @@ function draw() {
         ctx.textAlign = 'right';
         ctx.fillText(`Pre-Update: ${preUpdateScore}`, canvas.width - 10, 60);
     }
+
+    ctx.restore();
 }
 
 function drawGameOver() {

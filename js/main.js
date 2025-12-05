@@ -45,7 +45,15 @@ function resetGame() {
     };
 
     platforms = [
-        { x: 0, y: canvas.height - 20, width: canvas.width, height: 20, isMoving: false, isTemporary: false }
+        { 
+            x: 0, 
+            y: canvas.height - 20, 
+            width: canvas.width, 
+            height: 20, 
+            isMoving: false, 
+            isTemporary: false,
+            isGround: true 
+        }
     ];
 
     score = 0;
@@ -82,27 +90,54 @@ function update(deltaTime) {
     // SPEZIALFALL: GAME OVER
     // ============================================================
     if (gameOver) {
+        // 1. NEU: Horizontale Bewegung erlauben (statt velocityX = 0)
+        if (keys.right) {
+            player.velocityX = CONFIG.PLAYER.speed;
+        } else if (keys.left) {
+            player.velocityX = -CONFIG.PLAYER.speed;
+        } else {
+            player.velocityX = 0;
+        }
+
+        // 2. Schwerkraft anwenden
         player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
-        
-        // Terminal Velocity auch im Game Over
         if (player.velocityY > CONFIG.MAX_FALL_SPEED) {
             player.velocityY = CONFIG.MAX_FALL_SPEED;
         }
 
-        player.y += player.velocityY * deltaTime;
+        // 3. Position aktualisieren (X und Y)
         player.x += player.velocityX * deltaTime;
+        player.y += player.velocityY * deltaTime;
 
+        // 4. NEU: Grenzen prüfen (damit man nicht aus dem Bild fliegt)
+        if (player.x < 0) player.x = 0;
+        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+        // 5. KAMERA-LOGIK (Nach unten folgen)
         const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
         
-        // Wenn der Spieler unter die Mitte fällt, schieben wir die Welt nach oben
         if (player.y > cameraThreshold) {
             const scrollUpAmount = player.y - cameraThreshold;
             player.y = cameraThreshold; 
             platforms.forEach(p => p.y -= scrollUpAmount); 
         }
+
+        // 6. BODEN-KOLLISION PRÜFEN
+        const ground = platforms.find(p => p.isGround);
         
-        // HIER löschen wir Plattformen, die OBEN rausfliegen (die sehen wir eh nie wieder)
-        platforms = platforms.filter(p => p.y > -100);
+        if (ground) {
+            if (
+                player.y + player.height >= ground.y && 
+                player.y < ground.y + ground.height &&  
+                player.x < ground.x + ground.width &&   
+                player.x + player.width > ground.x
+            ) {
+                player.y = ground.y - player.height;
+                player.velocityY = 0;
+                // Hinweis: Da wir velocityX oben setzen, kann der Spieler
+                // jetzt auf dem Boden hin und her rutschen.
+            }
+        }
 
         return; 
     }
@@ -119,8 +154,6 @@ function update(deltaTime) {
         }
     });
 
-    // Wir löschen nur bröckelnde Plattformen, die verschwunden sind.
-    // WICHTIG: Wir löschen NICHT mehr Plattformen, die unten rausfallen!
     platforms = platforms.filter(p => !p.isTemporary || p.disappearTimer > 0 || !p.isDisappearing);
 
 
@@ -199,14 +232,7 @@ function update(deltaTime) {
             if (player.coyoteTimeCounter > 0) player.coyoteTimeCounter -= deltaTime;
         }
 
-        // WICHTIG: Die Zeile "platforms = platforms.filter(p => p.y < canvas.height);" wurde ENTFERNT.
-        // Stattdessen generieren wir einfach neue, wenn die höchste Plattform zu tief rutscht.
-        
-        // Wir prüfen die HÖCHSTE Plattform (die mit dem kleinsten Y-Wert)
-        // Da das Array sortiert generiert wird, ist die letzte im Array die höchste.
         const highestPlatform = platforms[platforms.length - 1];
-        
-        // Wenn die höchste Plattform in den sichtbaren Bereich kommt (oder kurz davor), neue generieren
         if (highestPlatform.y > -50) {
             generator.generate(platforms, player, score);
         }
@@ -225,9 +251,6 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     platforms.forEach(platform => {
-        // PERFORMANCE OPTIMIERUNG:
-        // Zeichne die Plattform NUR, wenn sie im sichtbaren Bereich ist.
-        // Da wir alte Plattformen nicht mehr löschen, ist das wichtig für die FPS.
         if (platform.y > canvas.height || platform.y + platform.height < 0) {
             return;
         }
@@ -248,7 +271,6 @@ function draw() {
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
-    // HUD
     ctx.fillStyle = 'black';
     ctx.font = '24px Poppins, Arial';
     ctx.textAlign = 'left';

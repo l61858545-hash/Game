@@ -3,7 +3,7 @@ export const CONFIG = {
     CANVAS_HEIGHT: 600,
     GRAVITY: 60,
     JUMP_STRENGTH: -1200,
-    MAX_FALL_SPEED: 900,
+    AIR_RESISTANCE: 0.1, 
     COYOTE_TIME: 0.2,
     DISAPPEAR_TIME: 0.2,
     

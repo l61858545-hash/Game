@@ -86,7 +86,7 @@ function gameLoop(currentTime) {
     draw(); 
 
     if (gameOver) {
-        // KORREKTUR: Wir zeigen das Overlay SOFORT an, nicht erst beim Aufprall.
+        // KORREKTUR: Overlay SOFORT anzeigen, nicht auf Aufprall warten
         drawGameOver(); 
         
         if (keys.enter) {
@@ -114,10 +114,11 @@ function update(deltaTime) {
         else if (keys.left) player.velocityX = -CONFIG.PLAYER.speed;
         else player.velocityX = 0;
 
+        // 1. Schwerkraft
         player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
-        if (player.velocityY > CONFIG.MAX_FALL_SPEED) {
-            player.velocityY = CONFIG.MAX_FALL_SPEED;
-        }
+
+        // 2. Luftwiderstand (sehr gering -> hohe Geschwindigkeit)
+        player.velocityY -= player.velocityY * CONFIG.AIR_RESISTANCE * deltaTime;
 
         player.x += player.velocityX * deltaTime;
         player.y += player.velocityY * deltaTime;
@@ -138,7 +139,7 @@ function update(deltaTime) {
         const ground = platforms.find(p => p.isGround);
         
         if (ground) {
-            // 1. BERECHNE FALL-SHAKE INTENSITÄT (DYNAMISCH)
+            // Shake Intensität berechnen
             const currentDistance = ground.y - (player.y + player.height);
             
             if (maxFallDistance > 0 && currentDistance > 0) {
@@ -146,24 +147,26 @@ function update(deltaTime) {
                 let intensity = 1 - ratio;
                 intensity = Math.max(0, Math.min(1, intensity));
                 intensity = intensity * intensity; 
-
                 currentFallShake = intensity * CONFIG.SHAKE.FALL_MAX_STRENGTH;
             } else {
                 currentFallShake = CONFIG.SHAKE.FALL_MAX_STRENGTH;
             }
 
-            // 2. Kollisionsprüfung
-            if (
-                player.x < ground.x + ground.width &&
-                player.x + player.width > ground.x &&
-                player.y + player.height >= ground.y && 
-                player.y < ground.y + ground.height
-            ) {
-                player.y = ground.y - player.height;
-                player.velocityY = 0;
-                triggerGroundShake();
-                hasHitGround = true;
-                currentFallShake = 0; 
+            // KORREKTUR: Robuste Kollisionserkennung (Anti-Tunneling)
+            // Wir prüfen nur: Ist der Spieler horizontal über dem Boden?
+            if (player.x < ground.x + ground.width && player.x + player.width > ground.x) {
+                
+                // Und: Ist der Spieler jetzt TIEFER als die Bodenoberkante?
+                // Egal wie tief (auch wenn er schon 500px durchgerauscht ist), wir fangen ihn ab.
+                if (player.y + player.height >= ground.y) {
+                    
+                    player.y = ground.y - player.height; // Auf den Boden setzen
+                    player.velocityY = 0;
+                    
+                    triggerGroundShake();
+                    hasHitGround = true;
+                    currentFallShake = 0; 
+                }
             }
         }
         return; 
@@ -196,10 +199,9 @@ function update(deltaTime) {
         keys.up = false; 
     }
 
+    // Physik Normal
     player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
-    if (player.velocityY > CONFIG.MAX_FALL_SPEED) {
-        player.velocityY = CONFIG.MAX_FALL_SPEED;
-    }
+    player.velocityY -= player.velocityY * CONFIG.AIR_RESISTANCE * deltaTime;
 
     player.x += player.velocityX * deltaTime;
     player.y += player.velocityY * deltaTime;

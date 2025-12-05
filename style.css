@@ -22,7 +22,7 @@ canvas {
     border: 8px solid #fff; /* Dicker weißer Rahmen wie bei einem Foto */
     border-radius: 4px;
     display: block;
-    cursor: none;
+    cursor: pointer;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); /* Schöner Schatten für Tiefe */
 }
 

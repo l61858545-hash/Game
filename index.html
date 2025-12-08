@@ -3,14 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- CACHE CONTROL: Zwingt den Browser, nach Updates zu suchen -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <title>Game</title>
     
-    <!-- NEU: Google Font "Poppins" für einen modernen Look -->
+    <!-- Google Font "Poppins" -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
     
-    <!-- Favicon -->
+    <!-- Favicon (Rotes Quadrat) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='red'/></svg>">
     
     <link rel="stylesheet" href="style.css">
@@ -42,6 +48,24 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js"></script>
+    <!-- AUTOMATISCHER UPDATE-ZWANG (Cache Busting) -->
+    <script>
+        // Wir erstellen einen Zeitstempel
+        const version = new Date().getTime();
+
+        // Funktion um Scripts dynamisch zu laden
+        function loadScript(src, isModule = false) {
+            const script = document.createElement('script');
+            script.src = src + "?v=" + version; 
+            if (isModule) {
+                script.type = "module";
+            }
+            document.body.appendChild(script);
+        }
+
+        // WICHTIG: Wir laden NUR NOCH das Hauptmodul!
+        // main.js kümmert sich um den Import aller anderen Dateien aus dem js/ Ordner.
+        loadScript("js/main.js", true); 
+    </script>
 </body>
 </html>

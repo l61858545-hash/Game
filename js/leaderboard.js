@@ -7,12 +7,16 @@ const PROXY_URL = "https://api.codetabs.com/v1/proxy?quest=";
 // DOM Elemente cachen
 const elements = {
     overlay: document.getElementById('leaderboardOverlay'),
+    title: document.querySelector('#leaderboardOverlay h2'),
+    subTitle: document.querySelector('#leaderboardOverlay h3'),
+    scoreLabel: document.querySelector('.score-label'), // NEU: Das Label "Dein Score"
     scoreDisplay: document.getElementById('finalScoreDisplay'),
     nameInput: document.getElementById('playerName'),
     submitBtn: document.getElementById('submitScoreBtn'),
     list: document.getElementById('leaderboardList'),
     inputSection: document.getElementById('inputSection'),
-    changePlayerBtn: document.getElementById('changePlayerBtn')
+    changePlayerBtn: document.getElementById('changePlayerBtn'),
+    restartHint: document.querySelector('.restart-hint')
 };
 
 let isSubmitting = false;
@@ -26,15 +30,69 @@ export function initLeaderboard() {
     });
 }
 
-export function showLeaderboard(score) {
+export function showLeaderboard(score, titleText = "GAME OVER", readOnly = false) {
     elements.overlay.classList.remove('hidden');
     elements.scoreDisplay.innerText = score;
     
-    const savedName = localStorage.getItem('playerName');
-    const personalBest = parseInt(localStorage.getItem('personalBest') || '0');
+    // Titel setzen und Farbe anpassen
+    if (elements.title) {
+        elements.title.innerText = titleText;
+        
+        // Klassen zurücksetzen
+        elements.title.classList.remove('title-green', 'title-blue');
 
+        if (titleText === "START GAME") {
+            elements.title.classList.add('title-green');
+        } else if (titleText === "Rangliste") {
+            elements.title.classList.add('title-blue');
+        }
+    }
+
+    // Untertitel "Rangliste" ausblenden, wenn der Haupttitel schon "Rangliste" ist
+    if (elements.subTitle) {
+        if (titleText === "Rangliste") {
+            elements.subTitle.classList.add('hidden');
+        } else {
+            elements.subTitle.classList.remove('hidden');
+        }
+    }
+
+    // NEU: Label anpassen ("Best" beim Start, sonst "Dein Score")
+    if (elements.scoreLabel) {
+        if (titleText === "START GAME") {
+            elements.scoreLabel.innerText = "Best";
+        } else {
+            elements.scoreLabel.innerText = "Dein Score";
+        }
+    }
+
+    // Text für Start vs. Neustart anpassen
+    if (elements.restartHint) {
+        if (titleText === "START GAME") {
+            elements.restartHint.innerHTML = "Drücke <strong>ENTER</strong> zum Starten";
+        } else {
+            elements.restartHint.innerHTML = "Drücke <strong>ENTER</strong> zum Neustarten";
+        }
+    }
+
+    // ReadOnly Modus (für In-Game Ansicht)
+    if (readOnly) {
+        elements.inputSection.classList.add('hidden');
+        if (elements.restartHint) elements.restartHint.classList.add('hidden');
+        fetchLeaderboard(); // Daten laden
+        return; // Hier abbrechen, keine Input-Logik nötig
+    } else {
+        // Normaler Modus: Alles anzeigen
+        elements.inputSection.classList.remove('hidden');
+        if (elements.restartHint) elements.restartHint.classList.remove('hidden');
+    }
+    
+    // --- Ab hier normale Game Over Logik ---
     elements.inputSection.style.display = 'block';
     isSubmitting = false;
+
+    const savedName = localStorage.getItem('playerName');
+    const personalBest = parseInt(localStorage.getItem('personalBest') || '0');
 
     if (savedName) {
         elements.nameInput.value = savedName;
@@ -58,6 +116,12 @@ export function showLeaderboard(score) {
         elements.submitBtn.innerText = "Score senden";
         elements.submitBtn.disabled = false;
         fetchLeaderboard();
+    }
+}
+
+export function updateScoreDisplay(score) {
+    if (elements.scoreDisplay) {
+        elements.scoreDisplay.innerText = score;
     }
 }
 

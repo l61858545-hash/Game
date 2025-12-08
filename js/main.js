@@ -1,11 +1,19 @@
 import { CONFIG } from './config.js';
 import { keys, setupInput } from './input.js';
 import { checkVersionAndStorage, getHighScores, saveHighScore } from './storage.js';
-import { initLeaderboard, showLeaderboard, hideLeaderboard } from './leaderboard.js';
+import { initLeaderboard, showLeaderboard, hideLeaderboard, updateScoreDisplay } from './leaderboard.js';
 import { PlatformGenerator } from './generator.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
+// HUD Elemente cachen
+const hudElements = {
+    score: document.getElementById('hudScore'),
+    best: document.getElementById('hudBest'),
+    preUpdateBox: document.getElementById('hudPreUpdate'),
+    preUpdateValue: document.getElementById('hudPreUpdateValue')
+};
 
 canvas.width = CONFIG.CANVAS_WIDTH;
 canvas.height = CONFIG.CANVAS_HEIGHT;
@@ -14,6 +22,11 @@ canvas.height = CONFIG.CANVAS_HEIGHT;
 let player, platforms, score, gameOver;
 let highScore, preUpdateScore;
 let lastTime = 0;
+
+// Status für den Startbildschirm
+let isStartScreen = true;
+// Status für Live-Leaderboard
+let isLeaderboardActive = false;
 
 // Shake Variablen
 let impactShakeTimer = 0;
@@ -33,8 +46,20 @@ function init() {
     highScore = scores.highScore;
     preUpdateScore = scores.preUpdateScore;
 
-    hideLeaderboard();
+    // Pre-Update Anzeige initialisieren
+    if (preUpdateScore > 0) {
+        hudElements.preUpdateBox.classList.remove('hidden');
+        hudElements.preUpdateValue.innerText = preUpdateScore;
+    } else {
+        hudElements.preUpdateBox.classList.add('hidden');
+    }
+
     resetGame();
+    gameOver = true; 
+    isStartScreen = true; 
+    
+    draw();
+    drawGameOver(); 
     
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
@@ -65,6 +90,7 @@ function resetGame() {
 
     score = 0;
     gameOver = false;
+    isLeaderboardActive = false; // Reset
     
     impactShakeTimer = 0;
     hasHitGround = false;
@@ -86,11 +112,12 @@ function gameLoop(currentTime) {
     draw(); 
 
     if (gameOver) {
-        // KORREKTUR: Overlay SOFORT anzeigen, nicht auf Aufprall warten
         drawGameOver(); 
         
         if (keys.enter) {
+            // Verhindern, dass Enter sofort als Neustart zählt, wenn man gerade aus dem Live-Leaderboard kommt
             keys.enter = false; 
+            isStartScreen = false; 
             resetGame();
             hideLeaderboard();
         }
@@ -105,9 +132,33 @@ function update(deltaTime) {
     }
 
     // ============================================================
-    // SPEZIALFALL: GAME OVER
+    // LIVE LEADERBOARD CHECK (Nur wenn Spiel läuft)
+    // ============================================================
+    if (!gameOver && !isStartScreen) {
+        if (keys.enter) {
+            if (!isLeaderboardActive) {
+                // Erstmaliges Öffnen
+                showLeaderboard(score, "Rangliste", true); 
+                isLeaderboardActive = true;
+            } else {
+                // Nur Score updaten, wenn schon offen
+                updateScoreDisplay(score);
+            }
+        } else {
+            // Taste losgelassen
+            if (isLeaderboardActive) {
+                hideLeaderboard();
+                isLeaderboardActive = false;
+            }
+        }
+    }
+
+    // ============================================================
+    // SPEZIALFALL: GAME OVER (oder START SCREEN)
     // ============================================================
     if (gameOver) {
+        if (isStartScreen) return;
+
         if (hasHitGround) return;
 
         if (keys.right) player.velocityX = CONFIG.PLAYER.speed;
@@ -117,7 +168,7 @@ function update(deltaTime) {
         // 1. Schwerkraft
         player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
 
-        // 2. Luftwiderstand (sehr gering -> hohe Geschwindigkeit)
+        // 2. Luftwiderstand
         player.velocityY -= player.velocityY * CONFIG.AIR_RESISTANCE * deltaTime;
 
         player.x += player.velocityX * deltaTime;
@@ -139,7 +190,6 @@ function update(deltaTime) {
         const ground = platforms.find(p => p.isGround);
         
         if (ground) {
-            // Shake Intensität berechnen
             const currentDistance = ground.y - (player.y + player.height);
             
             if (maxFallDistance > 0 && currentDistance > 0) {
@@ -152,17 +202,10 @@ function update(deltaTime) {
                 currentFallShake = CONFIG.SHAKE.FALL_MAX_STRENGTH;
             }
 
-            // KORREKTUR: Robuste Kollisionserkennung (Anti-Tunneling)
-            // Wir prüfen nur: Ist der Spieler horizontal über dem Boden?
             if (player.x < ground.x + ground.width && player.x + player.width > ground.x) {
-                
-                // Und: Ist der Spieler jetzt TIEFER als die Bodenoberkante?
-                // Egal wie tief (auch wenn er schon 500px durchgerauscht ist), wir fangen ihn ab.
                 if (player.y + player.height >= ground.y) {
-                    
-                    player.y = ground.y - player.height; // Auf den Boden setzen
+                    player.y = ground.y - player.height; 
                     player.velocityY = 0;
-                    
                     triggerGroundShake();
                     hasHitGround = true;
                     currentFallShake = 0; 
@@ -333,30 +376,25 @@ function draw() {
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
-    // HUD
-    ctx.fillStyle = 'black';
-    ctx.font = '24px Poppins, Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(`Score: ${score}`, 10, 30);
-    ctx.textAlign = 'right';
-    ctx.fillText(`Best: ${highScore}`, canvas.width - 10, 30);
-    if (preUpdateScore > 0) {
-        ctx.fillStyle = '#555';
-        ctx.font = '18px Poppins, Arial';
-        ctx.textAlign = 'right';
-        ctx.fillText(`Pre-Update: ${preUpdateScore}`, canvas.width - 10, 60);
-    }
+    // HUD UPDATE (HTML statt Canvas)
+    if (hudElements.score) hudElements.score.innerText = score;
+    if (hudElements.best) hudElements.best.innerText = highScore;
+    // Pre-Update wird nur einmal in init() gesetzt, da es sich nicht ändert
 
     ctx.restore();
 }
 
 function drawGameOver() {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    const overlay = document.getElementById('leaderboardOverlay');
-    if (overlay && overlay.classList.contains('hidden')) {
-        showLeaderboard(score);
+    if (gameOver) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        const overlay = document.getElementById('leaderboardOverlay');
+        if (overlay && overlay.classList.contains('hidden')) {
+            const title = isStartScreen ? "START GAME" : "GAME OVER";
+            const scoreToShow = isStartScreen ? highScore : score;
+            showLeaderboard(scoreToShow, title);
+        }
     }
 }
 

@@ -25,9 +25,31 @@
     <div style="position: relative;">
         <canvas id="gameCanvas"></canvas>
         
+        <!-- NEU: HUD (Heads-Up Display) für Score und Best -->
+        <div id="gameHud">
+            <!-- Linke Seite: Aktueller Score -->
+            <div class="hud-box">
+                <span class="hud-label">Score</span>
+                <span id="hudScore">0</span>
+            </div>
+
+            <!-- Rechte Seite: Highscore & Pre-Update -->
+            <div class="hud-right-wrapper">
+                <div class="hud-box">
+                    <span class="hud-label">Best</span>
+                    <span id="hudBest">0</span>
+                </div>
+                <div id="hudPreUpdate" class="hud-box hidden" style="margin-top: 5px; opacity: 0.7;">
+                    <span class="hud-label">Old</span>
+                    <span id="hudPreUpdateValue">0</span>
+                </div>
+            </div>
+        </div>
+
         <!-- Overlay für Game Over und Rangliste -->
         <div id="leaderboardOverlay" class="hidden">
             <h2>GAME OVER</h2>
+            <h3>Rangliste</h3>
             <p class="score-label">Dein Score</p>
             <p class="score-value"><span id="finalScoreDisplay">0</span></p>
             
@@ -39,7 +61,6 @@
                 <button id="submitScoreBtn">SCORE SENDEN</button>
             </div>
 
-            <h3>Rangliste</h3>
             <ul id="leaderboardList">
                 <li>Lade Daten...</li>
             </ul>
@@ -64,7 +85,6 @@
         }
 
         // WICHTIG: Wir laden NUR NOCH das Hauptmodul!
-        // main.js kümmert sich um den Import aller anderen Dateien aus dem js/ Ordner.
         loadScript("js/main.js", true); 
     </script>
 </body>

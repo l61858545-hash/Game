@@ -4,28 +4,32 @@ import { checkVersionAndStorage, getHighScores, saveHighScore } from './storage.
 import { initLeaderboard, showLeaderboard, hideLeaderboard, updateScoreDisplay } from './leaderboard.js';
 import { PlatformGenerator } from './generator.js';
 
+// NEUE IMPORTS
+import { Player } from './player.js';
+import { Physics } from './physics.js';
+import { Renderer } from './renderer.js';
+
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-
-// HUD Elemente cachen
-const hudElements = {
-    score: document.getElementById('hudScore'),
-    best: document.getElementById('hudBest'),
-    preUpdateBox: document.getElementById('hudPreUpdate'),
-    preUpdateValue: document.getElementById('hudPreUpdateValue')
-};
 
 canvas.width = CONFIG.CANVAS_WIDTH;
 canvas.height = CONFIG.CANVAS_HEIGHT;
 
+// Instanzen
+const renderer = new Renderer(canvas, ctx);
+const player = new Player(canvas.width, canvas.height);
+const generator = new PlatformGenerator(canvas.width);
+
 // State
-let player, platforms, score, gameOver;
-let highScore, preUpdateScore;
+let platforms = [];
+let score = 0;
+let gameOver = false;
+let highScore = 0;
+let preUpdateScore = 0;
 let lastTime = 0;
 
-// Status für den Startbildschirm
+// Status Flags
 let isStartScreen = true;
-// Status für Live-Leaderboard
 let isLeaderboardActive = false;
 
 // Shake Variablen
@@ -34,8 +38,6 @@ let impactShakeStrength = 0;
 let hasHitGround = false;
 let currentFallShake = 0;
 let maxFallDistance = 0;
-
-const generator = new PlatformGenerator(canvas.width);
 
 function init() {
     setupInput();
@@ -46,35 +48,23 @@ function init() {
     highScore = scores.highScore;
     preUpdateScore = scores.preUpdateScore;
 
-    // Pre-Update Anzeige initialisieren
-    if (preUpdateScore > 0) {
-        hudElements.preUpdateBox.classList.remove('hidden');
-        hudElements.preUpdateValue.innerText = preUpdateScore;
-    } else {
-        hudElements.preUpdateBox.classList.add('hidden');
-    }
+    renderer.initHUD(preUpdateScore);
 
     resetGame();
     gameOver = true; 
     isStartScreen = true; 
     
+    // Einmal zeichnen für den Hintergrund
     draw();
-    drawGameOver(); 
+    renderer.drawGameOverScreen(isStartScreen, score, highScore);
     
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
 }
 
 function resetGame() {
-    player = {
-        ...CONFIG.PLAYER,
-        x: canvas.width / 2 - CONFIG.PLAYER.width / 2,
-        y: canvas.height - 100,
-        velocityX: 0,
-        velocityY: 0,
-        isJumping: false,
-        coyoteTimeCounter: 0
-    };
+    player.reset();
+    generator.reset();
 
     platforms = [
         { 
@@ -90,14 +80,12 @@ function resetGame() {
 
     score = 0;
     gameOver = false;
-    isLeaderboardActive = false; // Reset
+    isLeaderboardActive = false;
     
     impactShakeTimer = 0;
     hasHitGround = false;
     currentFallShake = 0;
     maxFallDistance = 0;
-
-    generator.reset();
 
     for (let i = 0; i < 10; i++) {
         generator.generate(platforms, player, score);
@@ -105,17 +93,18 @@ function resetGame() {
 }
 
 function gameLoop(currentTime) {
-    const deltaTime = (currentTime - lastTime) / 1000;
+    let deltaTime = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
+
+    if (deltaTime > 0.1) deltaTime = 0.016; 
 
     update(deltaTime);
     draw(); 
 
     if (gameOver) {
-        drawGameOver(); 
+        renderer.drawGameOverScreen(isStartScreen, score, highScore);
         
         if (keys.enter) {
-            // Verhindern, dass Enter sofort als Neustart zählt, wenn man gerade aus dem Live-Leaderboard kommt
             keys.enter = false; 
             isStartScreen = false; 
             resetGame();
@@ -127,25 +116,18 @@ function gameLoop(currentTime) {
 }
 
 function update(deltaTime) {
-    if (impactShakeTimer > 0) {
-        impactShakeTimer -= deltaTime;
-    }
+    if (impactShakeTimer > 0) impactShakeTimer -= deltaTime;
 
-    // ============================================================
-    // LIVE LEADERBOARD CHECK (Nur wenn Spiel läuft)
-    // ============================================================
+    // Live Leaderboard Logic
     if (!gameOver && !isStartScreen) {
         if (keys.enter) {
             if (!isLeaderboardActive) {
-                // Erstmaliges Öffnen
                 showLeaderboard(score, "Rangliste", true); 
                 isLeaderboardActive = true;
             } else {
-                // Nur Score updaten, wenn schon offen
                 updateScoreDisplay(score);
             }
         } else {
-            // Taste losgelassen
             if (isLeaderboardActive) {
                 hideLeaderboard();
                 isLeaderboardActive = false;
@@ -153,55 +135,40 @@ function update(deltaTime) {
         }
     }
 
-    // ============================================================
-    // SPEZIALFALL: GAME OVER (oder START SCREEN)
-    // ============================================================
+    // Game Over / Start Screen Logic
     if (gameOver) {
         if (isStartScreen) return;
-
         if (hasHitGround) return;
 
-        if (keys.right) player.velocityX = CONFIG.PLAYER.speed;
-        else if (keys.left) player.velocityX = -CONFIG.PLAYER.speed;
-        else player.velocityX = 0;
-
-        // 1. Schwerkraft
-        player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
-
-        // 2. Luftwiderstand
-        player.velocityY -= player.velocityY * CONFIG.AIR_RESISTANCE * deltaTime;
-
-        player.x += player.velocityX * deltaTime;
-        player.y += player.velocityY * deltaTime;
-
-        if (player.x < 0) player.x = 0;
-        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-
-        // Kamera folgt nach unten
-        const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
+        // Game Over Physik (Fallen)
+        // WICHTIG: Auch hier deltaTime übergeben!
+        player.handleInput(keys, deltaTime); 
         
+        Physics.applyGravity(player, deltaTime);
+        Physics.movePlayer(player, deltaTime, canvas.width);
+        
+        // Kamera folgt beim Fallen
+        const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
         if (player.y > cameraThreshold) {
             const scrollUpAmount = player.y - cameraThreshold;
             player.y = cameraThreshold; 
             platforms.forEach(p => p.y -= scrollUpAmount); 
         }
 
-        // Boden-Kollision & Shake-Berechnung
+        // Boden-Kollision im Game Over
         const ground = platforms.find(p => p.isGround);
-        
         if (ground) {
+            // Shake Berechnung
             const currentDistance = ground.y - (player.y + player.height);
-            
             if (maxFallDistance > 0 && currentDistance > 0) {
                 const ratio = currentDistance / maxFallDistance;
-                let intensity = 1 - ratio;
-                intensity = Math.max(0, Math.min(1, intensity));
-                intensity = intensity * intensity; 
+                let intensity = (1 - ratio) ** 2;
                 currentFallShake = intensity * CONFIG.SHAKE.FALL_MAX_STRENGTH;
             } else {
                 currentFallShake = CONFIG.SHAKE.FALL_MAX_STRENGTH;
             }
 
+            // Aufprall
             if (player.x < ground.x + ground.width && player.x + player.width > ground.x) {
                 if (player.y + player.height >= ground.y) {
                     player.y = ground.y - player.height; 
@@ -215,10 +182,9 @@ function update(deltaTime) {
         return; 
     }
 
-    // ============================================================
-    // NORMALES SPIELVERHALTEN
-    // ============================================================
+    // --- NORMALES SPIEL ---
 
+    // 1. Plattformen Update
     platforms.forEach(p => {
         if (p.isDisappearing) p.disappearTimer -= deltaTime;
         if (p.isMoving) {
@@ -226,96 +192,41 @@ function update(deltaTime) {
             if (p.x < 0 || p.x + p.width > canvas.width) p.moveDirection *= -1;
         }
     });
-
     platforms = platforms.filter(p => !p.isTemporary || p.disappearTimer > 0 || !p.isDisappearing);
 
-    if (!gameOver) {
-        if (keys.right) player.velocityX = player.speed;
-        else if (keys.left) player.velocityX = -player.speed;
-        else player.velocityX = 0;
+    // 2. Spieler Input & Timer
+    // WICHTIG: deltaTime übergeben!
+    player.handleInput(keys, deltaTime);
+    player.updateTimers(deltaTime);
 
-        if (keys.up && player.coyoteTimeCounter > 0) {
-            player.velocityY = CONFIG.JUMP_STRENGTH;
-            player.isJumping = true;
-            player.coyoteTimeCounter = 0;
-        }
-        keys.up = false; 
-    }
+    // 3. Physik (Sprung & Bewegung)
+    Physics.handleJump(player);
+    Physics.applyGravity(player, deltaTime);
+    Physics.movePlayer(player, deltaTime, canvas.width);
 
-    // Physik Normal
-    player.velocityY += CONFIG.GRAVITY * 60 * deltaTime;
-    player.velocityY -= player.velocityY * CONFIG.AIR_RESISTANCE * deltaTime;
+    // 4. Kamera Scroll
+    const scoreIncrease = Physics.updateCamera(player, platforms, canvas.height);
+    score += scoreIncrease;
 
-    player.x += player.velocityX * deltaTime;
-    player.y += player.velocityY * deltaTime;
-
-    if (player.x < 0) player.x = 0;
-    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-
-    const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
-
-    if (!gameOver) {
-        if (player.y < cameraThreshold) {
-            const scrollAmount = cameraThreshold - player.y;
-            player.y = cameraThreshold;
-            score += Math.floor(scrollAmount);
-            platforms.forEach(p => p.y += scrollAmount);
-        }
-    }
-
-    let onPlatform = false;
-    platforms.forEach(platform => {
-        const previousPlayerBottom = (player.y - player.velocityY * deltaTime) + player.height;
-        if (
-            player.velocityY >= 0 &&
-            player.x < platform.x + platform.width && player.x + player.width > platform.x &&
-            previousPlayerBottom <= platform.y + 1 &&
-            player.y + player.height >= platform.y
-        ) {
-            player.y = platform.y - player.height;
-            player.velocityY = 0;
-            onPlatform = true;
-
-            if (platform.isMoving) {
-                player.x += platform.moveSpeed * platform.moveDirection * 60 * deltaTime;
-            }
-            if (platform.isTemporary && !platform.isDisappearing) {
-                platform.isDisappearing = true;
-                platform.disappearTimer = CONFIG.DISAPPEAR_TIME;
-            }
-        }
-    });
-
+    // 5. Kollisionen
+    const onPlatform = Physics.checkCollisions(player, platforms, deltaTime);
+    
     if (onPlatform) {
         player.isJumping = false;
         player.coyoteTimeCounter = CONFIG.COYOTE_TIME;
-    } else {
-        if (player.coyoteTimeCounter > 0) player.coyoteTimeCounter -= deltaTime;
     }
 
+    // 6. Generator
     const highestPlatform = platforms[platforms.length - 1];
     if (highestPlatform.y > -50) {
         generator.generate(platforms, player, score);
     }
 
-    // Game Over Bedingung
-    let lowestVisiblePlatformY = -Infinity;
-    platforms.forEach(p => {
-        if (p.y < canvas.height && p.y > lowestVisiblePlatformY) {
-            lowestVisiblePlatformY = p.y;
-        }
-    });
-    if (lowestVisiblePlatformY === -Infinity) lowestVisiblePlatformY = canvas.height;
-
-    if (player.y > lowestVisiblePlatformY + player.height) {
+    // 7. Game Over Check
+    if (Physics.checkGameOver(player, platforms, canvas.height)) {
         gameOver = true;
-        
         const ground = platforms.find(p => p.isGround);
-        if (ground) {
-            maxFallDistance = ground.y - player.y;
-        } else {
-            maxFallDistance = 5000; 
-        }
+        maxFallDistance = ground ? (ground.y - player.y) : 5000;
 
         if (score > highScore) {
             highScore = score;
@@ -330,18 +241,15 @@ function triggerGroundShake() {
 }
 
 function draw() {
-    ctx.save();
-
+    // Shake berechnen
     let shakeX = 0;
     let shakeY = 0;
 
-    // 1. Fall-Shake
     if (gameOver && !hasHitGround && currentFallShake > 0) {
         shakeX += (Math.random() - 0.5) * 2 * currentFallShake;
         shakeY += (Math.random() - 0.5) * 2 * currentFallShake;
     }
 
-    // 2. Impact-Shake
     if (impactShakeTimer > 0) {
         const decay = impactShakeTimer / CONFIG.SHAKE.GROUND_DURATION;
         const currentImpactStrength = impactShakeStrength * decay;
@@ -349,53 +257,8 @@ function draw() {
         shakeY += (Math.random() - 0.5) * 2 * currentImpactStrength;
     }
 
-    if (shakeX !== 0 || shakeY !== 0) {
-        ctx.translate(shakeX, shakeY);
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    platforms.forEach(platform => {
-        if (platform.y > canvas.height || platform.y + platform.height < 0) {
-            return;
-        }
-
-        if (platform.isTemporary) {
-            ctx.fillStyle = '#C2B280';
-            if (platform.isDisappearing && platform.disappearTimer < 1 && Math.floor(platform.disappearTimer * 10) % 2 === 0) {
-                ctx.fillStyle = 'white';
-            }
-        } else if (platform.isMoving) {
-            ctx.fillStyle = '#FFA500';
-        } else {
-            ctx.fillStyle = 'green';
-        }
-        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
-    });
-
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x, player.y, player.width, player.height);
-
-    // HUD UPDATE (HTML statt Canvas)
-    if (hudElements.score) hudElements.score.innerText = score;
-    if (hudElements.best) hudElements.best.innerText = highScore;
-    // Pre-Update wird nur einmal in init() gesetzt, da es sich nicht ändert
-
-    ctx.restore();
-}
-
-function drawGameOver() {
-    if (gameOver) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        const overlay = document.getElementById('leaderboardOverlay');
-        if (overlay && overlay.classList.contains('hidden')) {
-            const title = isStartScreen ? "START GAME" : "GAME OVER";
-            const scoreToShow = isStartScreen ? highScore : score;
-            showLeaderboard(scoreToShow, title);
-        }
-    }
+    // Alles an den Renderer übergeben
+    renderer.draw(player, platforms, score, highScore, shakeX, shakeY);
 }
 
 init();

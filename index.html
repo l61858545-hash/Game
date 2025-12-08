@@ -70,12 +70,8 @@
     </div>
 
     <script>
-        // 1. Zeitstempel generieren
         const version = new Date().getTime();
 
-        // 2. Import Map erstellen
-        // Hier definieren wir für JEDE Datei, dass sie mit ?v=... geladen werden soll.
-        // Das löst das Problem für alle verschachtelten Imports.
         const importMap = {
             "imports": {
                 "./js/main.js": `./js/main.js?v=${version}`,
@@ -83,21 +79,21 @@
                 "./js/input.js": `./js/input.js?v=${version}`,
                 "./js/leaderboard.js": `./js/leaderboard.js?v=${version}`,
                 "./js/storage.js": `./js/storage.js?v=${version}`,
-                "./js/generator.js": `./js/generator.js?v=${version}`
+                "./js/generator.js": `./js/generator.js?v=${version}`,
+                // NEUE DATEIEN:
+                "./js/player.js": `./js/player.js?v=${version}`,
+                "./js/physics.js": `./js/physics.js?v=${version}`,
+                "./js/renderer.js": `./js/renderer.js?v=${version}`
             }
         };
 
-        // 3. Import Map in den Head schreiben
         const im = document.createElement('script');
         im.type = 'importmap';
         im.textContent = JSON.stringify(importMap);
         document.head.appendChild(im);
 
-        // 4. Das Hauptmodul laden
-        // Wir importieren es jetzt über den Pfad, der in der Map definiert ist
         const script = document.createElement('script');
         script.type = 'module';
-        // WICHTIG: Hier importieren wir direkt den Pfad aus der Map
         script.textContent = "import './js/main.js';";
         document.body.appendChild(script);
     </script>

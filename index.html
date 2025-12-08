@@ -69,23 +69,37 @@
         </div>
     </div>
 
-    <!-- AUTOMATISCHER UPDATE-ZWANG (Cache Busting) -->
     <script>
-        // Wir erstellen einen Zeitstempel
+        // 1. Zeitstempel generieren
         const version = new Date().getTime();
 
-        // Funktion um Scripts dynamisch zu laden
-        function loadScript(src, isModule = false) {
-            const script = document.createElement('script');
-            script.src = src + "?v=" + version; 
-            if (isModule) {
-                script.type = "module";
+        // 2. Import Map erstellen
+        // Hier definieren wir für JEDE Datei, dass sie mit ?v=... geladen werden soll.
+        // Das löst das Problem für alle verschachtelten Imports.
+        const importMap = {
+            "imports": {
+                "./js/main.js": `./js/main.js?v=${version}`,
+                "./js/config.js": `./js/config.js?v=${version}`,
+                "./js/input.js": `./js/input.js?v=${version}`,
+                "./js/leaderboard.js": `./js/leaderboard.js?v=${version}`,
+                "./js/storage.js": `./js/storage.js?v=${version}`,
+                "./js/generator.js": `./js/generator.js?v=${version}`
             }
-            document.body.appendChild(script);
-        }
+        };
 
-        // WICHTIG: Wir laden NUR NOCH das Hauptmodul!
-        loadScript("js/main.js", true); 
+        // 3. Import Map in den Head schreiben
+        const im = document.createElement('script');
+        im.type = 'importmap';
+        im.textContent = JSON.stringify(importMap);
+        document.head.appendChild(im);
+
+        // 4. Das Hauptmodul laden
+        // Wir importieren es jetzt über den Pfad, der in der Map definiert ist
+        const script = document.createElement('script');
+        script.type = 'module';
+        // WICHTIG: Hier importieren wir direkt den Pfad aus der Map
+        script.textContent = "import './js/main.js';";
+        document.body.appendChild(script);
     </script>
 </body>
 </html>

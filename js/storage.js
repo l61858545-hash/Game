@@ -3,7 +3,10 @@ import { CONFIG } from './config.js';
 const KEYS = {
     VERSION: 'platformerVersion',
     HIGHSCORE: 'platformerHighScore',
-    PRE_UPDATE: 'platformerPreUpdateScore'
+    PRE_UPDATE: 'platformerPreUpdateScore',
+    // Wir brauchen Zugriff auf den Key aus leaderboard.js, 
+    // auch wenn er dort hardcoded ist, wissen wir, dass er 'personalBest' heißt.
+    PERSONAL_BEST: 'personalBest' 
 };
 
 export async function checkVersionAndStorage() {
@@ -15,14 +18,24 @@ export async function checkVersionAndStorage() {
         const savedVersion = localStorage.getItem(KEYS.VERSION);
 
         if (lastModified && lastModified !== savedVersion) {
-            console.log('Update erkannt!');
+            console.log('Update erkannt! Setze Scores zurück...');
+            
             const currentHighScore = parseInt(localStorage.getItem(KEYS.HIGHSCORE) || '0', 10);
             const existingPreUpdateScore = parseInt(localStorage.getItem(KEYS.PRE_UPDATE) || '0', 10);
 
+            // Den alten Highscore als "Old" speichern
             if (currentHighScore > existingPreUpdateScore) {
                 localStorage.setItem(KEYS.PRE_UPDATE, currentHighScore.toString());
             }
+            
+            // Lokalen Highscore resetten
             localStorage.setItem(KEYS.HIGHSCORE, '0');
+            
+            // WICHTIG: Auch den Vergleichswert für das Leaderboard resetten!
+            // Damit fängt man in der neuen Version auch online wieder bei 0 an.
+            localStorage.removeItem(KEYS.PERSONAL_BEST);
+
+            // Neue Version speichern
             localStorage.setItem(KEYS.VERSION, lastModified);
         }
     } catch (e) {

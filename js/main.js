@@ -4,7 +4,6 @@ import { checkVersionAndStorage, getHighScores, saveHighScore } from './storage.
 import { initLeaderboard, showLeaderboard, hideLeaderboard, updateScoreDisplay } from './leaderboard.js';
 import { PlatformGenerator } from './generator.js';
 
-// NEUE IMPORTS
 import { Player } from './player.js';
 import { Physics } from './physics.js';
 import { Renderer } from './renderer.js';
@@ -54,7 +53,6 @@ function init() {
     gameOver = true; 
     isStartScreen = true; 
     
-    // Einmal zeichnen für den Hintergrund
     draw();
     renderer.drawGameOverScreen(isStartScreen, score, highScore);
     
@@ -105,6 +103,19 @@ function gameLoop(currentTime) {
         renderer.drawGameOverScreen(isStartScreen, score, highScore);
         
         if (keys.enter) {
+            // WICHTIG: Prüfen, ob der Spieler gerade seinen Namen eingibt
+            const activeElement = document.activeElement;
+            const nameInput = document.getElementById('playerName');
+            
+            // Wenn wir im Textfeld sind, NICHT neustarten (Enter bestätigt dort ggf. das Formular)
+            if (activeElement === nameInput) {
+                // Optional: Hier könnte man den Submit-Button triggern, 
+                // aber das macht meistens das Formular selbst oder der User klickt.
+                // Wir verhindern nur den Neustart.
+                keys.enter = false;
+                return;
+            }
+
             keys.enter = false; 
             isStartScreen = false; 
             resetGame();
@@ -140,14 +151,11 @@ function update(deltaTime) {
         if (isStartScreen) return;
         if (hasHitGround) return;
 
-        // Game Over Physik (Fallen)
-        // WICHTIG: Auch hier deltaTime übergeben!
         player.handleInput(keys, deltaTime); 
         
         Physics.applyGravity(player, deltaTime);
         Physics.movePlayer(player, deltaTime, canvas.width);
         
-        // Kamera folgt beim Fallen
         const cameraThreshold = canvas.height * CONFIG.CAMERA_THRESHOLD_FACTOR;
         if (player.y > cameraThreshold) {
             const scrollUpAmount = player.y - cameraThreshold;
@@ -155,10 +163,8 @@ function update(deltaTime) {
             platforms.forEach(p => p.y -= scrollUpAmount); 
         }
 
-        // Boden-Kollision im Game Over
         const ground = platforms.find(p => p.isGround);
         if (ground) {
-            // Shake Berechnung
             const currentDistance = ground.y - (player.y + player.height);
             if (maxFallDistance > 0 && currentDistance > 0) {
                 const ratio = currentDistance / maxFallDistance;
@@ -168,7 +174,6 @@ function update(deltaTime) {
                 currentFallShake = CONFIG.SHAKE.FALL_MAX_STRENGTH;
             }
 
-            // Aufprall
             if (player.x < ground.x + ground.width && player.x + player.width > ground.x) {
                 if (player.y + player.height >= ground.y) {
                     player.y = ground.y - player.height; 
@@ -184,7 +189,6 @@ function update(deltaTime) {
 
     // --- NORMALES SPIEL ---
 
-    // 1. Plattformen Update
     platforms.forEach(p => {
         if (p.isDisappearing) p.disappearTimer -= deltaTime;
         if (p.isMoving) {
@@ -194,21 +198,16 @@ function update(deltaTime) {
     });
     platforms = platforms.filter(p => !p.isTemporary || p.disappearTimer > 0 || !p.isDisappearing);
 
-    // 2. Spieler Input & Timer
-    // WICHTIG: deltaTime übergeben!
     player.handleInput(keys, deltaTime);
     player.updateTimers(deltaTime);
 
-    // 3. Physik (Sprung & Bewegung)
     Physics.handleJump(player);
     Physics.applyGravity(player, deltaTime);
     Physics.movePlayer(player, deltaTime, canvas.width);
 
-    // 4. Kamera Scroll
     const scoreIncrease = Physics.updateCamera(player, platforms, canvas.height);
     score += scoreIncrease;
 
-    // 5. Kollisionen
     const onPlatform = Physics.checkCollisions(player, platforms, deltaTime);
     
     if (onPlatform) {
@@ -216,13 +215,11 @@ function update(deltaTime) {
         player.coyoteTimeCounter = CONFIG.COYOTE_TIME;
     }
 
-    // 6. Generator
     const highestPlatform = platforms[platforms.length - 1];
     if (highestPlatform.y > -50) {
         generator.generate(platforms, player, score);
     }
 
-    // 7. Game Over Check
     if (Physics.checkGameOver(player, platforms, canvas.height)) {
         gameOver = true;
         const ground = platforms.find(p => p.isGround);
@@ -241,7 +238,6 @@ function triggerGroundShake() {
 }
 
 function draw() {
-    // Shake berechnen
     let shakeX = 0;
     let shakeY = 0;
 
@@ -257,7 +253,6 @@ function draw() {
         shakeY += (Math.random() - 0.5) * 2 * currentImpactStrength;
     }
 
-    // Alles an den Renderer übergeben
     renderer.draw(player, platforms, score, highScore, shakeX, shakeY);
 }
 

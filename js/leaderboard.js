@@ -9,7 +9,7 @@ const elements = {
     overlay: document.getElementById('leaderboardOverlay'),
     title: document.querySelector('#leaderboardOverlay h2'),
     subTitle: document.querySelector('#leaderboardOverlay h3'),
-    scoreLabel: document.querySelector('.score-label'), // NEU: Das Label "Dein Score"
+    scoreLabel: document.querySelector('.score-label'),
     scoreDisplay: document.getElementById('finalScoreDisplay'),
     nameInput: document.getElementById('playerName'),
     submitBtn: document.getElementById('submitScoreBtn'),
@@ -37,8 +37,6 @@ export function showLeaderboard(score, titleText = "GAME OVER", readOnly = false
     // Titel setzen und Farbe anpassen
     if (elements.title) {
         elements.title.innerText = titleText;
-        
-        // Klassen zurücksetzen
         elements.title.classList.remove('title-green', 'title-blue');
 
         if (titleText === "START GAME") {
@@ -48,7 +46,7 @@ export function showLeaderboard(score, titleText = "GAME OVER", readOnly = false
         }
     }
 
-    // Untertitel "Rangliste" ausblenden, wenn der Haupttitel schon "Rangliste" ist
+    // Untertitel steuern
     if (elements.subTitle) {
         if (titleText === "Rangliste") {
             elements.subTitle.classList.add('hidden');
@@ -57,7 +55,7 @@ export function showLeaderboard(score, titleText = "GAME OVER", readOnly = false
         }
     }
 
-    // NEU: Label anpassen ("Best" beim Start, sonst "Dein Score")
+    // Label anpassen
     if (elements.scoreLabel) {
         if (titleText === "START GAME") {
             elements.scoreLabel.innerText = "Best";
@@ -66,7 +64,7 @@ export function showLeaderboard(score, titleText = "GAME OVER", readOnly = false
         }
     }
 
-    // Text für Start vs. Neustart anpassen
+    // Restart Hint anpassen
     if (elements.restartHint) {
         if (titleText === "START GAME") {
             elements.restartHint.innerHTML = "Drücke <strong>ENTER</strong> zum Starten";
@@ -75,19 +73,18 @@ export function showLeaderboard(score, titleText = "GAME OVER", readOnly = false
         }
     }
 
-    // ReadOnly Modus (für In-Game Ansicht)
+    // ReadOnly Modus
     if (readOnly) {
         elements.inputSection.classList.add('hidden');
         if (elements.restartHint) elements.restartHint.classList.add('hidden');
-        fetchLeaderboard(); // Daten laden
-        return; // Hier abbrechen, keine Input-Logik nötig
+        fetchLeaderboard(); 
+        return; 
     } else {
-        // Normaler Modus: Alles anzeigen
         elements.inputSection.classList.remove('hidden');
         if (elements.restartHint) elements.restartHint.classList.remove('hidden');
     }
     
-    // --- Ab hier normale Game Over Logik ---
+    // --- Game Over Logik ---
     elements.inputSection.style.display = 'block';
     isSubmitting = false;
 
@@ -95,20 +92,26 @@ export function showLeaderboard(score, titleText = "GAME OVER", readOnly = false
     const personalBest = parseInt(localStorage.getItem('personalBest') || '0');
 
     if (savedName) {
+        // Name existiert -> Automatisch prüfen
         elements.nameInput.value = savedName;
         elements.nameInput.disabled = true; 
         elements.changePlayerBtn.classList.remove('hidden');
         elements.submitBtn.classList.add('hidden'); 
 
+        console.log(`Prüfe Score: Aktuell ${score} vs Personal Best ${personalBest}`);
+
         if (score > personalBest) {
+            console.log("Neuer Rekord! Sende automatisch...");
             elements.submitBtn.classList.remove('hidden');
             elements.submitBtn.disabled = true;
             elements.submitBtn.innerText = "Neuer Rekord! Sende...";
             submitScore(score);
         } else {
+            console.log("Kein neuer Rekord. Lade nur Liste.");
             fetchLeaderboard();
         }
     } else {
+        // Kein Name -> Manuelle Eingabe erforderlich
         elements.nameInput.value = "";
         elements.nameInput.disabled = false;
         elements.changePlayerBtn.classList.add('hidden');
@@ -138,7 +141,9 @@ function resetPlayerName() {
     elements.submitBtn.classList.remove('hidden');
     elements.submitBtn.innerText = "Score senden";
     elements.submitBtn.disabled = false;
+    
     localStorage.removeItem('playerName');
+    localStorage.removeItem('personalBest'); // Reset auch den Highscore-Vergleich
 }
 
 async function submitScore(score) {
@@ -149,11 +154,10 @@ async function submitScore(score) {
     isSubmitting = true;
     let name = elements.nameInput.value.trim() || "Anonym";
     name = name.replace(/[^a-zA-Z0-9]/g, "_"); 
+    
+    // Name sofort speichern, damit er beim nächsten Mal da ist
     localStorage.setItem('playerName', name);
     
-    const currentBest = parseInt(localStorage.getItem('personalBest') || '0');
-    if (score > currentBest) localStorage.setItem('personalBest', score);
-
     const targetUrl = `${DREAMLO_URL}${DREAMLO_PRIVATE}/add/${name}/${score}`;
     const finalUrl = `${PROXY_URL}${encodeURIComponent(targetUrl)}`;
 
@@ -162,7 +166,16 @@ async function submitScore(score) {
         if (elements.submitBtn.innerText !== "Neuer Rekord! Sende...") {
              elements.submitBtn.innerText = "Sende...";
         }
+        
         await fetch(finalUrl);
+        
+        // WICHTIG: Erst JETZT den lokalen Bestwert aktualisieren!
+        // So verhindern wir, dass bei einem Fehler der Score lokal als "gesendet" gilt.
+        const currentBest = parseInt(localStorage.getItem('personalBest') || '0');
+        if (score > currentBest) {
+            localStorage.setItem('personalBest', score);
+            console.log("Score erfolgreich gesendet und lokal gespeichert.");
+        }
         
         elements.inputSection.style.display = 'block'; 
         elements.nameInput.disabled = true;
@@ -171,11 +184,12 @@ async function submitScore(score) {
         isSubmitting = false;
         setTimeout(fetchLeaderboard, 1000);
     } catch (error) {
-        console.error("Fehler:", error);
+        console.error("Fehler beim Senden:", error);
         elements.submitBtn.classList.remove('hidden');
         elements.submitBtn.disabled = false;
         elements.submitBtn.innerText = "Erneut versuchen";
         isSubmitting = false;
+        // Bei Fehler NICHT personalBest updaten, damit es beim nächsten Mal nochmal probiert wird
         setTimeout(fetchLeaderboard, 1000);
     }
 }

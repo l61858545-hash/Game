@@ -84,6 +84,26 @@ export class Physics {
         });
         if (lowestVisiblePlatformY === -Infinity) lowestVisiblePlatformY = canvasHeight;
 
-        return player.y > lowestVisiblePlatformY + player.height;
+        // Prüfen, ob der Spieler unter der untersten Plattform ist
+        if (player.y > lowestVisiblePlatformY + player.height) {
+            
+            // AUSNAHME 1: Coyote Time ist noch aktiv
+            // Der Spieler hat noch Zeit zu reagieren, also nicht töten.
+            if (player.coyoteTimeCounter > 0) {
+                return false;
+            }
+
+            // AUSNAHME 2: Der Spieler bewegt sich nach oben (Sprung geschafft!)
+            // Wenn velocityY negativ ist, springt er gerade. Auch wenn er tief unten ist,
+            // hat er sich gerettet und darf nicht sterben.
+            if (player.velocityY < 0) {
+                return false;
+            }
+
+            // Wenn keine Ausnahme greift -> Game Over
+            return true;
+        }
+
+        return false;
     }
 }

@@ -1,3 +1,5 @@
+import { keys } from './input.js'; // NEU: Importieren, um Enter abzufangen
+
 const DREAMLO_PUBLIC = "692962658f40bb18648fdf3e"; 
 const DREAMLO_PRIVATE = "Nkn6453l0USHQ6_oZshRtgifkDaWesTU2ctii129Jakw"; 
 
@@ -27,6 +29,20 @@ export function initLeaderboard() {
     elements.submitBtn.addEventListener('click', () => {
         const currentScore = parseInt(elements.scoreDisplay.innerText);
         submitScore(currentScore);
+    });
+
+    // NEU: Event Listener für Enter im Textfeld
+    elements.nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            // 1. Verhindern, dass das Spiel neu startet (Input konsumieren)
+            keys.enter = false; 
+            
+            // 2. Score senden, wenn nicht gerade schon gesendet wird
+            if (!isSubmitting && !elements.submitBtn.disabled) {
+                const currentScore = parseInt(elements.scoreDisplay.innerText);
+                submitScore(currentScore);
+            }
+        }
     });
 }
 
@@ -143,7 +159,7 @@ function resetPlayerName() {
     elements.submitBtn.disabled = false;
     
     localStorage.removeItem('playerName');
-    localStorage.removeItem('personalBest'); // Reset auch den Highscore-Vergleich
+    localStorage.removeItem('personalBest'); 
 }
 
 async function submitScore(score) {
@@ -155,7 +171,6 @@ async function submitScore(score) {
     let name = elements.nameInput.value.trim() || "Anonym";
     name = name.replace(/[^a-zA-Z0-9]/g, "_"); 
     
-    // Name sofort speichern, damit er beim nächsten Mal da ist
     localStorage.setItem('playerName', name);
     
     const targetUrl = `${DREAMLO_URL}${DREAMLO_PRIVATE}/add/${name}/${score}`;
@@ -169,8 +184,6 @@ async function submitScore(score) {
         
         await fetch(finalUrl);
         
-        // WICHTIG: Erst JETZT den lokalen Bestwert aktualisieren!
-        // So verhindern wir, dass bei einem Fehler der Score lokal als "gesendet" gilt.
         const currentBest = parseInt(localStorage.getItem('personalBest') || '0');
         if (score > currentBest) {
             localStorage.setItem('personalBest', score);
@@ -189,7 +202,6 @@ async function submitScore(score) {
         elements.submitBtn.disabled = false;
         elements.submitBtn.innerText = "Erneut versuchen";
         isSubmitting = false;
-        // Bei Fehler NICHT personalBest updaten, damit es beim nächsten Mal nochmal probiert wird
         setTimeout(fetchLeaderboard, 1000);
     }
 }

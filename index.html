@@ -25,7 +25,7 @@
     <div style="position: relative;">
         <canvas id="gameCanvas"></canvas>
         
-        <!-- NEU: HUD (Heads-Up Display) für Score und Best -->
+        <!-- HUD (Heads-Up Display) für Score und Best -->
         <div id="gameHud">
             <!-- Linke Seite: Aktueller Score -->
             <div class="hud-box">
@@ -49,7 +49,9 @@
         <!-- Overlay für Game Over und Rangliste -->
         <div id="leaderboardOverlay" class="hidden">
             <h2>GAME OVER</h2>
-            <h3>Rangliste</h3>
+            
+            <!-- HIER WAR VORHER "Rangliste" - JETZT ENTFERNT -->
+
             <p class="score-label">Dein Score</p>
             <p class="score-value"><span id="finalScoreDisplay">0</span></p>
             
@@ -61,6 +63,9 @@
                 <button id="submitScoreBtn">SCORE SENDEN</button>
             </div>
 
+            <!-- HIERHIN VERSCHOBEN: -->
+            <h3>Rangliste</h3>
+            
             <ul id="leaderboardList">
                 <li>Lade Daten...</li>
             </ul>
@@ -69,6 +74,7 @@
         </div>
     </div>
 
+    <!-- AUTOMATISCHER UPDATE-ZWANG (Import Maps) -->
     <script>
         const version = new Date().getTime();
 
@@ -80,7 +86,6 @@
                 "./js/leaderboard.js": `./js/leaderboard.js?v=${version}`,
                 "./js/storage.js": `./js/storage.js?v=${version}`,
                 "./js/generator.js": `./js/generator.js?v=${version}`,
-                // NEUE DATEIEN:
                 "./js/player.js": `./js/player.js?v=${version}`,
                 "./js/physics.js": `./js/physics.js?v=${version}`,
                 "./js/renderer.js": `./js/renderer.js?v=${version}`

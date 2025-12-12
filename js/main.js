@@ -38,6 +38,10 @@ let hasHitGround = false;
 let currentFallShake = 0;
 let maxFallDistance = 0;
 
+// NEU: Variablen für Fixed Time Step
+const FIXED_TIME_STEP = 1 / 60; // Physik läuft immer mit 60 FPS (0.01666s)
+let accumulator = 0;
+
 function init() {
     setupInput();
     initLeaderboard();
@@ -53,6 +57,7 @@ function init() {
     gameOver = true; 
     isStartScreen = true; 
     
+    // Einmal zeichnen für den Hintergrund
     draw();
     renderer.drawGameOverScreen(isStartScreen, score, highScore);
     
@@ -84,6 +89,9 @@ function resetGame() {
     hasHitGround = false;
     currentFallShake = 0;
     maxFallDistance = 0;
+    
+    // Accumulator resetten
+    accumulator = 0;
 
     for (let i = 0; i < 10; i++) {
         generator.generate(platforms, player, score);
@@ -94,25 +102,34 @@ function gameLoop(currentTime) {
     let deltaTime = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
 
-    if (deltaTime > 0.1) deltaTime = 0.016; 
+    // Sicherheits-Cap: Wenn der Tab lange im Hintergrund war, nicht versuchen,
+    // 1000 Updates auf einmal nachzuholen (verhindert "Spiral of Death")
+    if (deltaTime > 0.25) deltaTime = 0.25;
 
-    update(deltaTime);
+    // Zeit zum Accumulator hinzufügen
+    accumulator += deltaTime;
+
+    // WICHTIG: Physik in festen Schritten abarbeiten
+    // Solange genug Zeit im "Tank" (Accumulator) ist, führen wir Updates durch.
+    while (accumulator >= FIXED_TIME_STEP) {
+        update(FIXED_TIME_STEP); // Immer exakt 0.01666s übergeben
+        accumulator -= FIXED_TIME_STEP;
+    }
+
+    // Zeichnen tun wir so oft der Monitor es erlaubt (Interpolation wäre hier der nächste Pro-Step, aber so reicht es meistens)
     draw(); 
 
     if (gameOver) {
         renderer.drawGameOverScreen(isStartScreen, score, highScore);
         
         if (keys.enter) {
-            // WICHTIG: Prüfen, ob der Spieler gerade seinen Namen eingibt
+            // Check ob im Input-Feld
             const activeElement = document.activeElement;
             const nameInput = document.getElementById('playerName');
             
-            // Wenn wir im Textfeld sind, NICHT neustarten (Enter bestätigt dort ggf. das Formular)
             if (activeElement === nameInput) {
-                // Optional: Hier könnte man den Submit-Button triggern, 
-                // aber das macht meistens das Formular selbst oder der User klickt.
-                // Wir verhindern nur den Neustart.
                 keys.enter = false;
+                requestAnimationFrame(gameLoop); // Loop am Leben halten
                 return;
             }
 
